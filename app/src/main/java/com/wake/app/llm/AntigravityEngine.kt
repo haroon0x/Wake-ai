@@ -49,8 +49,8 @@ class AntigravityEngine(
                 put("input", prompt)
                 put("stream", true)
                 put("tools", JSONArray().apply {
-                    put(JSONObject().put("code_execution", JSONObject()))
-                    put(JSONObject().put("google_search", JSONObject()))
+                    put(JSONObject().put("type", "code_execution"))
+                    put(JSONObject().put("type", "google_search"))
                 })
                 lastInteractionId?.let { put("previous_interaction_id", it) }
             }

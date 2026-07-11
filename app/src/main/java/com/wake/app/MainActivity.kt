@@ -151,6 +151,8 @@ private fun ChatScreen(
     var showNotifications by remember { mutableStateOf(false) }
     var showAgent by remember { mutableStateOf(openAgentInitially) }
     var deepResearchEnabled by remember { mutableStateOf(false) }
+    var showDeepResearchConsent by remember { mutableStateOf(false) }
+    val context = LocalContext.current
 
     LaunchedEffect(messages.size, messages.lastOrNull()?.text?.length) {
         if (messages.isNotEmpty()) listState.scrollToItem(messages.lastIndex)
@@ -198,7 +200,13 @@ private fun ChatScreen(
                 onQueryChange = { query = it },
                 enabled = !busy && query.isNotBlank(),
                 deepResearchEnabled = deepResearchEnabled,
-                onDeepResearchChange = { deepResearchEnabled = it },
+                onDeepResearchChange = { enabled ->
+                    if (enabled && !Prefs.deepResearchAcknowledged(context)) {
+                        showDeepResearchConsent = true
+                    } else {
+                        deepResearchEnabled = enabled
+                    }
+                },
                 onSend = {
                     if (!busy && query.isNotBlank()) {
                         chatViewModel.send(query, deepResearchEnabled)
@@ -209,6 +217,29 @@ private fun ChatScreen(
         }
     }
 
+    if (showDeepResearchConsent) {
+        AlertDialog(
+            onDismissRequest = { showDeepResearchConsent = false },
+            title = { Text("Send memories to the cloud?") },
+            text = {
+                Text(
+                    "Deep Research sends your question and up to 12 related captured memories to Google's cloud model, " +
+                        "which can also search the web and run code. Memories may include private messages and screen text. " +
+                        "Wake stays fully on-device when this is off."
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    Prefs.setDeepResearchAcknowledged(context)
+                    deepResearchEnabled = true
+                    showDeepResearchConsent = false
+                }) { Text("Allow") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeepResearchConsent = false }) { Text("Cancel") }
+            }
+        )
+    }
     if (showSettings) {
         SettingsSheet(
             onDismiss = { showSettings = false },
@@ -565,9 +596,9 @@ private fun InputBar(
                 Spacer(modifier = Modifier.weight(1f))
                 if (deepResearchEnabled) {
                     Text(
-                        text = "iAPI Cloud Sandbox enabled",
+                        text = "Sends related memories to Google cloud",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary
+                        color = MaterialTheme.colorScheme.secondary
                     )
                 }
             }

@@ -46,6 +46,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.AlertDialog
@@ -77,6 +78,9 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -85,10 +89,14 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.wake.app.data.MemoryEvent
+import com.wake.app.data.SOURCE_NOTIFICATION
 import com.wake.app.ui.ChatMessage
 import com.wake.app.ui.ChatViewModel
 import com.wake.app.ui.WakeTheme
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -122,9 +130,10 @@ private fun ChatScreen(
     val listState = rememberLazyListState()
     var query by remember { mutableStateOf("") }
     var showSettings by remember { mutableStateOf(false) }
+    var showNotifications by remember { mutableStateOf(false) }
 
-    LaunchedEffect(messages.size) {
-        if (messages.isNotEmpty()) listState.animateScrollToItem(messages.lastIndex)
+    LaunchedEffect(messages.size, messages.lastOrNull()?.text?.length) {
+        if (messages.isNotEmpty()) listState.scrollToItem(messages.lastIndex)
     }
 
     Surface(
@@ -132,7 +141,10 @@ private fun ChatScreen(
         color = MaterialTheme.colorScheme.background
     ) {
         Column(modifier = Modifier.fillMaxSize().navigationBarsPadding()) {
-            TopBar(onSettings = { showSettings = true })
+            TopBar(
+                onNotifications = { showNotifications = true },
+                onSettings = { showSettings = true }
+            )
             Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                 if (messages.isEmpty()) {
                     EmptyState(onSuggestion = chatViewModel::send)
@@ -180,10 +192,19 @@ private fun ChatScreen(
             onAccessibility = onAccessibility
         )
     }
+    if (showNotifications) {
+        NotificationChatSheet(
+            onDismiss = { showNotifications = false },
+            onAsk = {
+                showNotifications = false
+                chatViewModel.send(it)
+            }
+        )
+    }
 }
 
 @Composable
-private fun TopBar(onSettings: () -> Unit) {
+private fun TopBar(onNotifications: () -> Unit, onSettings: () -> Unit) {
     Surface(color = MaterialTheme.colorScheme.surface) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 12.dp, top = 12.dp, bottom = 10.dp),
@@ -202,6 +223,9 @@ private fun TopBar(onSettings: () -> Unit) {
                 Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primary, modifier = Modifier.fillMaxSize()) {}
             }
             Spacer(modifier = Modifier.weight(1f))
+            IconButton(onClick = onNotifications) {
+                Icon(Icons.Outlined.Notifications, contentDescription = "Captured notifications")
+            }
             IconButton(onClick = onSettings) {
                 Icon(Icons.Outlined.Settings, contentDescription = "Engine settings")
             }
@@ -256,25 +280,172 @@ private fun MessageBubble(message: ChatMessage, modifier: Modifier = Modifier) {
     ) {
         Surface(
             modifier = Modifier
-                .widthIn(max = 300.dp)
+                .then(if (user) Modifier.widthIn(max = 300.dp) else Modifier.fillMaxWidth())
                 .animateContentSize(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)),
             shape = if (user) {
                 RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp, bottomEnd = 4.dp, bottomStart = 18.dp)
             } else {
                 RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp, bottomEnd = 18.dp, bottomStart = 4.dp)
             },
-            color = if (user) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
+            color = if (user) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
         ) {
             if (message.streaming && message.text.isEmpty()) {
                 TypingIndicator(modifier = Modifier.padding(horizontal = 16.dp, vertical = 15.dp))
             } else {
                 SelectionContainer {
                     Text(
-                        text = message.text,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 11.dp),
+                        text = formattedChatText(message.text),
+                        modifier = Modifier.padding(horizontal = if (user) 16.dp else 4.dp, vertical = 11.dp),
                         style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 22.sp),
                         color = if (user) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                }
+            }
+        }
+    }
+}
+
+private fun formattedChatText(value: String) = buildAnnotatedString {
+    value.lines().forEachIndexed { index, rawLine ->
+        val line = rawLine.trimEnd()
+        when {
+            line.startsWith("### ") -> withStyle(SpanStyle(fontWeight = FontWeight.SemiBold)) { append(line.drop(4)) }
+            line.startsWith("## ") -> withStyle(SpanStyle(fontWeight = FontWeight.Bold, fontSize = 18.sp)) { append(line.drop(3)) }
+            line.startsWith("# ") -> withStyle(SpanStyle(fontWeight = FontWeight.Bold, fontSize = 20.sp)) { append(line.drop(2)) }
+            line.startsWith("- ") || line.startsWith("* ") -> {
+                append("•  ")
+                appendInlineFormatting(line.drop(2))
+            }
+            else -> appendInlineFormatting(line)
+        }
+        if (index < value.lines().lastIndex) append('\n')
+    }
+}
+
+private fun androidx.compose.ui.text.AnnotatedString.Builder.appendInlineFormatting(value: String) {
+    var cursor = 0
+    while (cursor < value.length) {
+        val bold = value.indexOf("**", cursor)
+        val code = value.indexOf('`', cursor)
+        val next = listOf(bold, code).filter { it >= 0 }.minOrNull()
+        if (next == null) {
+            append(value.substring(cursor))
+            return
+        }
+        append(value.substring(cursor, next))
+        if (next == bold) {
+            val end = value.indexOf("**", next + 2)
+            if (end < 0) {
+                append(value.substring(next))
+                return
+            }
+            withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(value.substring(next + 2, end)) }
+            cursor = end + 2
+        } else {
+            val end = value.indexOf('`', next + 1)
+            if (end < 0) {
+                append(value.substring(next))
+                return
+            }
+            withStyle(SpanStyle(fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace, color = Color(0xFF65D6C5))) {
+                append(value.substring(next + 1, end))
+            }
+            cursor = end + 1
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun NotificationChatSheet(onDismiss: () -> Unit, onAsk: (String) -> Unit) {
+    var notifications by remember { mutableStateOf<List<MemoryEvent>>(emptyList()) }
+    val timeFormat = remember { SimpleDateFormat("h:mm a", Locale.getDefault()) }
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    LaunchedEffect(Unit) {
+        notifications = WakeApp.instance.dao.since(
+            System.currentTimeMillis() - 7 * 86_400_000L,
+            100
+        ).filter { it.source == SOURCE_NOTIFICATION }.take(30)
+    }
+
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, bottom = 28.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Notification memory", style = MaterialTheme.typography.headlineSmall)
+                    Text(
+                        "Recent conversations captured by Wake",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                IconButton(onClick = onDismiss) {
+                    Icon(Icons.Outlined.Close, contentDescription = "Close")
+                }
+            }
+            if (notifications.isEmpty()) {
+                Surface(shape = RoundedCornerShape(18.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
+                    Column(modifier = Modifier.fillMaxWidth().padding(18.dp)) {
+                        Text("No notifications captured yet", fontWeight = FontWeight.SemiBold)
+                        Text(
+                            "Enable notification access in Settings. New messages will appear here.",
+                            modifier = Modifier.padding(top = 5.dp),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxWidth().height(480.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    itemsIndexed(notifications, key = { _, event -> event.id }) { _, event ->
+                        val source = event.appLabel ?: event.pkg ?: "Notification"
+                        Surface(
+                            onClick = {
+                                onAsk("Tell me about the notification from $source at ${timeFormat.format(Date(event.timestamp))}.")
+                            },
+                            shape = RoundedCornerShape(16.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant
+                        ) {
+                            Column(modifier = Modifier.fillMaxWidth().padding(14.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer) {
+                                        Text(
+                                            source.take(1).uppercase(Locale.getDefault()),
+                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                    Column(modifier = Modifier.padding(start = 10.dp).weight(1f)) {
+                                        Text(event.sender ?: source, fontWeight = FontWeight.SemiBold)
+                                        Text(
+                                            "$source · ${timeFormat.format(Date(event.timestamp))}",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                                Text(
+                                    event.text,
+                                    modifier = Modifier.padding(top = 10.dp),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    maxLines = 3
+                                )
+                                Text(
+                                    "Ask Wake about this",
+                                    modifier = Modifier.padding(top = 9.dp),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.secondary
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }

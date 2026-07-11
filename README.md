@@ -49,20 +49,6 @@ Semantic search is deliberately combined with FTS keyword search:
 
 The current embedding choice is appropriate for the demo because it runs on device, preserves privacy, works offline, and avoids the cost and latency of a cloud vector service. We should benchmark representative queries on real devices before replacing it; training a custom embedding model is not needed for this stage.
 
-## Demo talk track
-
-“Wake is an on-device AI memory for Android. We see messages, notifications, and information across many apps every day, but later we often cannot remember where something was said or what we were doing. Wake turns that temporary information into private, searchable memory.
-
-Wake captures notification text and the text currently visible on screen. We store text only, not screenshots or pixels, and banking and payment apps are excluded before anything is saved.
-
-Each capture is cleaned, deduplicated, grouped into a session, and stored locally. Then Wake creates an embedding, which is a numerical representation of meaning. That means a message saying ‘Let’s meet after lunch’ can still be found when I ask, ‘What did we decide about meeting later?’
-
-Our embedding layer is local and separate from the answer model. We use the bundled Universal Sentence Encoder TensorFlow Lite model through MediaPipe. Wake embeds both memories and user questions, then compares them with cosine similarity. We combine that semantic search with FTS keyword search, so exact names and words remain accurate while natural-language questions still work.
-
-After retrieval, Wake gives only the most relevant memories to the answer model. It can answer with local Gemma or a selected cloud model, and it cites the source and time of the information. It can also notice pending replies and propose reminders or reply drafts, but it never takes an external action without approval.
-
-The key idea is that Wake does not ask a large model to remember everything. It captures useful text, retrieves the right evidence locally, and uses AI to provide a grounded, safe answer.”
-
 ## Stack
 
 - Kotlin, Jetpack Compose, coroutines

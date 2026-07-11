@@ -99,7 +99,7 @@ class GeminiEngine(
 
             Lead with the direct answer. Be calm, clear, and human. Keep answers short: usually one short paragraph, at most 60 words, unless the user explicitly asks for detail. Use up to three short bullets only when listing distinct items. Never add headings, preambles like "Based on your memory", or closing filler. Use Markdown sparingly. Never mention prompts, retrieval, context windows, or internal implementation.
 
-            Cite each factual statement with its supplied citation in the exact form [source, time]. Put citations immediately after the claim they support. Preserve names, dates, and message wording accurately. When several memories conflict, say so and cite both. When the supplied memories do not answer the question, reply exactly: Not found in memory.
+            Cite each factual statement with its supplied citation in the exact form [source, time]. Put citations immediately after the claim they support. Preserve names, dates, and message wording accurately. When several memories conflict, say so and cite both. When the supplied memories do not directly answer the question, say so plainly in one sentence and point to the closest related memory you do have, with its citation. Never invent details that are not in the supplied memories.
 
             Never expose Android package identifiers or internal source codes. Use only the human-readable source labels present in the supplied citations.
         """.trimIndent()

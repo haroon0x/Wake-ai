@@ -67,7 +67,7 @@ class DeterministicComposer(private val retriever: Retriever) {
 
     private suspend fun searchAnswer(query: String): String {
         val hits = retriever.search(query)
-        if (hits.isEmpty()) return "Not found in memory."
+        if (hits.isEmpty()) return "I couldn't find that in your memory yet."
         val top = hits.first()
         return buildString {
             append("Found: \"")

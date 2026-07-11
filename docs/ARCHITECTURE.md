@@ -40,7 +40,7 @@ User question ─► MainActivity ─► GroundedAnswerer ─► Retriever (hybr
                               LlmEngine (Gemma on-device | Gemma 4 cloud | Gemini Flash cloud)
                                     │
                                     ▼
-                         Streamed, cited answer (or "Not found in memory.")
+                         Streamed, cited answer
 ```
 
 All captures are converted to text at ingest time; no pixels or screenshots are stored.
@@ -66,7 +66,7 @@ All captures are converted to text at ingest time; no pixels or screenshots are 
 
 ### `answer/`
 - `DeterministicComposer` — intent-routed answers with zero LLM ("what was I just doing", "pending replies", keyword search). The demo works even with no model on the phone.
-- `GroundedAnswerer` — retrieves top-k (8) events, builds a grounded prompt (answer only from context, cite `[source, time]`), streams the engine's output. Empty retrieval short-circuits to "Not found in memory." without invoking the model.
+- `GroundedAnswerer` — retrieves top-k (8) events via hybrid search, falling back to recent memory (2 h for temporal questions, 7 days otherwise) when search misses; builds a grounded prompt (answer only from context, cite `[source, time]`, admit misses and point to the closest related memory instead of a hard "not found") and streams the engine's output. Only a truly empty database short-circuits without a model call.
 
 ### `llm/` + `gemma/` — engines
 - `LlmEngine` — `name`, `isReady()`, `generate(prompt): Flow<String>`. GroundedAnswerer depends on this interface only.

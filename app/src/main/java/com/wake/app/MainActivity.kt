@@ -6,6 +6,7 @@ import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.app.NotificationManagerCompat
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -48,6 +49,9 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.Face
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Button
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -91,6 +95,8 @@ import androidx.lifecycle.LifecycleEventObserver
 import com.wake.app.data.MemoryEvent
 import com.wake.app.data.SOURCE_NOTIFICATION
 import com.wake.app.data.displaySource
+import com.wake.app.ui.AgentSheet
+import com.wake.app.ui.AgentViewModel
 import com.wake.app.ui.ChatMessage
 import com.wake.app.ui.ChatViewModel
 import com.wake.app.ui.WakeTheme
@@ -103,9 +109,17 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        if (android.os.Build.VERSION.SDK_INT >= 33 &&
+            checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) !=
+            android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
+                .launch(android.Manifest.permission.POST_NOTIFICATIONS)
+        }
+        val openAgent = intent.hasExtra(com.wake.app.agent.ActionExecutor.EXTRA_TASK_ID)
         setContent {
             WakeTheme {
-                ChatScreen(::openNotificationAccess, ::openAccessibility)
+                ChatScreen(::openNotificationAccess, ::openAccessibility, openAgentInitially = openAgent)
             }
         }
     }
@@ -124,14 +138,18 @@ class MainActivity : ComponentActivity() {
 private fun ChatScreen(
     onNotifications: () -> Unit,
     onAccessibility: () -> Unit,
-    chatViewModel: ChatViewModel = viewModel()
+    openAgentInitially: Boolean = false,
+    chatViewModel: ChatViewModel = viewModel(),
+    agentViewModel: AgentViewModel = viewModel()
 ) {
     val messages by chatViewModel.messages.collectAsState()
     val busy by chatViewModel.busy.collectAsState()
+    val proposedCount by agentViewModel.proposedCount.collectAsState()
     val listState = rememberLazyListState()
     var query by remember { mutableStateOf("") }
     var showSettings by remember { mutableStateOf(false) }
     var showNotifications by remember { mutableStateOf(false) }
+    var showAgent by remember { mutableStateOf(openAgentInitially) }
 
     LaunchedEffect(messages.size, messages.lastOrNull()?.text?.length) {
         if (messages.isNotEmpty()) listState.scrollToItem(messages.lastIndex)
@@ -144,7 +162,9 @@ private fun ChatScreen(
         Column(modifier = Modifier.fillMaxSize().navigationBarsPadding()) {
             TopBar(
                 onNotifications = { showNotifications = true },
-                onSettings = { showSettings = true }
+                onSettings = { showSettings = true },
+                onAgent = { showAgent = true },
+                agentBadge = proposedCount
             )
             Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                 if (messages.isEmpty()) {
@@ -193,6 +213,9 @@ private fun ChatScreen(
             onAccessibility = onAccessibility
         )
     }
+    if (showAgent) {
+        AgentSheet(onDismiss = { showAgent = false }, viewModel = agentViewModel)
+    }
     if (showNotifications) {
         NotificationChatSheet(
             onDismiss = { showNotifications = false },
@@ -205,7 +228,12 @@ private fun ChatScreen(
 }
 
 @Composable
-private fun TopBar(onNotifications: () -> Unit, onSettings: () -> Unit) {
+private fun TopBar(
+    onNotifications: () -> Unit,
+    onSettings: () -> Unit,
+    onAgent: () -> Unit,
+    agentBadge: Int
+) {
     Surface(color = MaterialTheme.colorScheme.surface) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 12.dp, top = 12.dp, bottom = 10.dp),
@@ -224,6 +252,17 @@ private fun TopBar(onNotifications: () -> Unit, onSettings: () -> Unit) {
                 Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primary, modifier = Modifier.fillMaxSize()) {}
             }
             Spacer(modifier = Modifier.weight(1f))
+            IconButton(onClick = onAgent) {
+                BadgedBox(
+                    badge = {
+                        if (agentBadge > 0) {
+                            Badge { Text("$agentBadge") }
+                        }
+                    }
+                ) {
+                    Icon(Icons.Outlined.Face, contentDescription = "Agent activity")
+                }
+            }
             IconButton(onClick = onNotifications) {
                 Icon(Icons.Outlined.Notifications, contentDescription = "Captured notifications")
             }

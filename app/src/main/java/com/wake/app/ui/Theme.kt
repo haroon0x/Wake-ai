@@ -11,12 +11,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 
 private val WakeColors = darkColorScheme(
-    primary = Color(0xFF8D84FF),
-    onPrimary = Color(0xFF11101C),
-    primaryContainer = Color(0xFF312D63),
-    onPrimaryContainer = Color(0xFFF0EEFF),
-    secondary = Color(0xFF65D6C5),
-    onSecondary = Color(0xFF07201C),
+    primary = Color(0xFF4FD6BF),
+    onPrimary = Color(0xFF06201B),
+    primaryContainer = Color(0xFF14453C),
+    onPrimaryContainer = Color(0xFFD3F5EC),
+    secondary = Color(0xFFE9C46A),
+    onSecondary = Color(0xFF241B04),
     background = Color(0xFF0B0D12),
     onBackground = Color(0xFFE9EAF0),
     surface = Color(0xFF10131A),

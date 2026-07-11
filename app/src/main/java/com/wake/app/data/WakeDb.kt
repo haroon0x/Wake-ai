@@ -6,12 +6,13 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 
 @Database(
-    entities = [MemoryEvent::class, MemoryFts::class],
-    version = 2,
+    entities = [MemoryEvent::class, MemoryFts::class, AgentTask::class],
+    version = 3,
     exportSchema = false
 )
 abstract class WakeDb : RoomDatabase() {
     abstract fun memoryDao(): MemoryDao
+    abstract fun agentTaskDao(): AgentTaskDao
 
     companion object {
         @Volatile private var instance: WakeDb? = null

@@ -1,4 +1,5 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
@@ -18,6 +19,15 @@ android {
         versionCode = 1
         versionName = "0.1.0"
 
+        val localProperties = Properties().apply {
+            val file = rootProject.file("local.properties")
+            if (file.isFile) file.inputStream().use(::load)
+        }
+        buildConfigField(
+            "String",
+            "WAKE_GEMINI_KEY",
+            "\"${localProperties.getProperty("WAKE_GEMINI_KEY").orEmpty()}\""
+        )
     }
 
     buildTypes {
@@ -35,7 +45,8 @@ android {
     }
 
     buildFeatures {
-        compose =true
+        compose = true
+        buildConfig = true
     }
 
     androidResources {

@@ -1,7 +1,11 @@
 package com.wake.app
 
 import android.app.Application
+import com.wake.app.agent.ActionExecutor
+import com.wake.app.agent.AgentEngine
+import com.wake.app.agent.AgentReasoner
 import com.wake.app.capture.Ingest
+import com.wake.app.data.AgentTaskDao
 import com.wake.app.data.MemoryDao
 import com.wake.app.data.Diagnostics
 import com.wake.app.data.WakeDb
@@ -35,6 +39,10 @@ class WakeApp : Application() {
         private set
     lateinit var gemmaCloudEngine: GeminiEngine
         private set
+    lateinit var agentTaskDao: AgentTaskDao
+        private set
+    lateinit var agent: AgentEngine
+        private set
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO.limitedParallelism(1))
 
@@ -43,8 +51,13 @@ class WakeApp : Application() {
         instance = this
         diagnostics = Diagnostics(this)
         dao = WakeDb.get(this).memoryDao()
+        agentTaskDao = WakeDb.get(this).agentTaskDao()
         embedder = Embedder(this)
-        ingest = Ingest(dao, scope, embedder, { Prefs.retentionDays(this) }, diagnostics = diagnostics)
+        ingest = Ingest(
+            dao, scope, embedder, { Prefs.retentionDays(this) },
+            diagnostics = diagnostics,
+            onStored = { event -> agent.onEvent(event) }
+        )
         retriever = Retriever(dao, embedder, diagnostics)
         gemmaEngine = GemmaEngine(this)
         geminiEngine = GeminiEngine(apiKeyProvider = { Prefs.geminiApiKey(this) })
@@ -53,6 +66,14 @@ class WakeApp : Application() {
             model = GeminiEngine.GEMMA_CLOUD_MODEL,
             name = "Gemma cloud"
         )
+        agent = AgentEngine(
+            taskDao = agentTaskDao,
+            memoryDao = dao,
+            reasoner = AgentReasoner { cloudEngine() },
+            executor = ActionExecutor(this),
+            scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        )
+        agent.start()
         if (Prefs.engineChoice(this) == "gemma") loadLocalModel()
         scope.launch {
             applyRetention()
@@ -73,6 +94,9 @@ class WakeApp : Application() {
             }
         }
     }
+
+    fun cloudEngine(): LlmEngine =
+        if (Prefs.engineChoice(this) == "gemini") geminiEngine else gemmaCloudEngine
 
     fun currentEngine(): LlmEngine = when (Prefs.engineChoice(this)) {
         "gemini" -> geminiEngine

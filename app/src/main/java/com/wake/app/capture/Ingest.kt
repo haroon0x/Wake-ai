@@ -17,7 +17,8 @@ class Ingest(
     private val embedder: Embedder? = null,
     private val retentionDaysProvider: () -> Int = { 30 },
     private val dedupWindowMillis: Long = 15 * 1000,
-    private val diagnostics: Diagnostics? = null
+    private val diagnostics: Diagnostics? = null,
+    private val onStored: ((MemoryEvent) -> Unit)? = null
 ) {
     private val grouper = SessionGrouper()
     private var grouperInitialized = false
@@ -80,8 +81,10 @@ class Ingest(
                     )
                     return@forEach
                 }
-                val id = dao.insert(capture.toEvent(sessionId, hash))
+                val event = capture.toEvent(sessionId, hash)
+                val id = dao.insert(event)
                 inserted++
+                onStored?.invoke(event.copy(id = id))
                 var embedded = false
                 var embeddingError: String? = null
                 runCatching {

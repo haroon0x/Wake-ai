@@ -22,7 +22,10 @@ Update this document whenever a feature lands: flip its status, and amend the af
 | Chat UI: streaming bubbles, typing indicator, suggestion chips, settings sheet | Done |
 | Retention policy + clear-all (settings sheet, `applyRetention`) | Done |
 | Debug-only JSONL ingestion/retrieval diagnostics | Done |
-| Agent actions (detect abandoned task → propose → act) | Not started |
+| Agent loop: pending-reply triggers → cloud reasoner → approval-gated actions (`agent/`) | Done (needs on-device verify) |
+| Agent actions: reminders (AlarmManager), reopen app, draft-to-clipboard | Done (needs on-device verify) |
+| Agent activity UI (live feed, trace timeline, approve/dismiss, badge) | Done (needs on-device verify) |
+| Bundled API key via `local.properties` → `BuildConfig` (user key overrides) | Done |
 
 ## Data flow
 
@@ -69,6 +72,14 @@ All captures are converted to text at ingest time; no pixels or screenshots are 
 - `LlmEngine` — `name`, `isReady()`, `generate(prompt): Flow<String>`. GroundedAnswerer depends on this interface only.
 - `GemmaEngine` — LiteRT-LM runner for `gemma-4-E2B-it.litertlm` loaded from the app's external files dir. GPU (OpenCL) backend first, CPU fallback, with streamed conversation inference and explicit resource cleanup.
 - `GeminiEngine` — Gemini Flash and Gemma 4 cloud via the `generativelanguage.googleapis.com` REST SSE endpoint, plain HttpURLConnection, no SDK dependency. Includes a built-in default API key for the demo; users can override it.
+
+### `agent/` — proactive loop
+- `AgentEngine` — the sense→decide→act→check loop. Deterministic triggers: a notification with a sender opens a `watching` task (dueAt = +3 min); another message refreshes it; seeing the sender's name in screen text from the same app closes it as handled. A 30 s heartbeat promotes overdue tasks to `thinking` and calls the reasoner, capped at 15 proposals/day and suppressed per sender after 2 dismissals in 24 h. Actions run only on user approval.
+- `AgentReasoner` — one cloud model call per fired trigger (Gemma cloud, or Gemini when selected). Strict JSON contract `{action, title, draft, reminder_minutes, confidence}`; one repair reprompt on parse failure, then a deterministic open-app fallback. `drop` or confidence < 0.3 closes the task silently.
+- `ActionExecutor` — typed capabilities: copy draft to clipboard + reopen the app (`reply`), AlarmManager reminder via `ReminderReceiver` (`remind`), launch app (`open_app`). Posts proposal notifications on the `wake_agent` channel that deep-link into the agent sheet.
+- `AgentTask` (Room, DB v3) — persistent agent state: `watching → thinking → proposed → done/dismissed/expired` plus a JSON trace timeline rendered in the UI.
+
+Agent visibility: the top bar shows an agent icon with a proposed-count badge opening `AgentSheet` — a live feed with a status pill per task (pulsing while watching/thinking), the trace timeline, draft preview, and approve/dismiss buttons.
 
 ### App shell
 - `WakeApp` — Application singleton; manual DI. Exposes dao, ingest, retriever, all three engines, and `answerer()` which picks the engine from prefs.

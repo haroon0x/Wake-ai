@@ -223,9 +223,9 @@ private fun ChatScreen(
             title = { Text("Send memories to the cloud?") },
             text = {
                 Text(
-                    "Deep Research sends your question and up to 12 related captured memories to Google's cloud model, " +
-                        "which can also search the web and run code. Memories may include private messages and screen text. " +
-                        "Wake stays fully on-device when this is off."
+                    "Deep Research sends your question plus at most 6 short excerpts of related memories (300 characters each) " +
+                        "to Google's cloud model, which can also search the web and run code. Nothing else leaves your phone, " +
+                        "and Wake stays fully on-device when this is off."
                 )
             },
             confirmButton = {
@@ -670,8 +670,22 @@ private fun SettingsSheet(
         onDispose { activity.lifecycle.removeObserver(observer) }
     }
 
+    var totalEvents by remember { mutableStateOf(0L) }
+    var notificationEvents by remember { mutableStateOf(0L) }
+    var screenEvents by remember { mutableStateOf(0L) }
+    var memorySince by remember { mutableStateOf<Long?>(null) }
+    var topApps by remember { mutableStateOf<List<String>>(emptyList()) }
+    var topSenders by remember { mutableStateOf<List<String>>(emptyList()) }
+
     LaunchedEffect(Unit) {
-        recent = WakeApp.instance.dao.since(System.currentTimeMillis() - 24 * 60 * 60_000L, Int.MAX_VALUE)
+        val dao = WakeApp.instance.dao
+        recent = dao.since(System.currentTimeMillis() - 24 * 60 * 60_000L, Int.MAX_VALUE)
+        totalEvents = dao.count()
+        notificationEvents = dao.countBySource(SOURCE_NOTIFICATION)
+        screenEvents = dao.countBySource(com.wake.app.data.SOURCE_SCREEN_TEXT)
+        memorySince = dao.earliestTimestamp()
+        topApps = dao.knownApps(4).filterNotNull()
+        topSenders = dao.knownSenders(4).filterNotNull()
     }
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
@@ -683,6 +697,26 @@ private fun SettingsSheet(
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             Text("Settings", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            Text("Your profile", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
+                Column(modifier = Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        "What Wake knows so far, from your own device. This never leaves your phone.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    if (totalEvents == 0L) {
+                        Text("No memories yet — enable capture below to start.", style = MaterialTheme.typography.bodyMedium)
+                    } else {
+                        memorySince?.let {
+                            ProfileRow("Remembering since", SimpleDateFormat("d MMM yyyy", Locale.getDefault()).format(Date(it)))
+                        }
+                        ProfileRow("Memories", "$totalEvents ($notificationEvents notifications, $screenEvents screen)")
+                        if (topSenders.isNotEmpty()) ProfileRow("Frequent contacts", topSenders.joinToString(", "))
+                        if (topApps.isNotEmpty()) ProfileRow("Most-seen apps", topApps.joinToString(", "))
+                    }
+                }
+            }
             Text("Engine", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 EngineChoice("Gemma on-device", "gemma", engine) {
@@ -785,6 +819,19 @@ private fun SettingsSheet(
                 TextButton(onClick = { showClearConfirmation = false }) { Text("Cancel") }
             }
         )
+    }
+}
+
+@Composable
+private fun ProfileRow(label: String, value: String) {
+    Row(verticalAlignment = Alignment.Top) {
+        Text(
+            label,
+            modifier = Modifier.width(150.dp),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
     }
 }
 

@@ -103,6 +103,15 @@ interface MemoryDao {
     @Query("SELECT sender FROM memory_event WHERE sender IS NOT NULL GROUP BY sender ORDER BY MAX(timestamp) DESC LIMIT :limit")
     suspend fun knownSenders(limit: Int): List<String?>
 
+    @Query("SELECT COUNT(*) FROM memory_event")
+    suspend fun count(): Long
+
+    @Query("SELECT COUNT(*) FROM memory_event WHERE source = :source")
+    suspend fun countBySource(source: String): Long
+
+    @Query("SELECT MIN(timestamp) FROM memory_event")
+    suspend fun earliestTimestamp(): Long?
+
     @Query("SELECT * FROM memory_event WHERE sessionId = :sessionId ORDER BY timestamp ASC")
     suspend fun bySession(sessionId: Long): List<MemoryEvent>
 

@@ -41,7 +41,7 @@ object Prefs {
 
     fun retentionDays(context: Context): Int =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .getInt(RETENTION_DAYS, 30)
+            .getInt(RETENTION_DAYS, 0)
 
     fun deepResearchAcknowledged(context: Context): Boolean =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)

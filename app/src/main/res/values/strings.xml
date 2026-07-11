@@ -1,5 +1,3 @@
-<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Wake</string>
-    <string name="accessibility_desc">Wake reads visible screen text so it can remember what you saw. Everything stays on this phone.</string>
+    <string name="accessibility_service_description">Capture visible text for Wake memory</string>
 </resources>

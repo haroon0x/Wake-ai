@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Running Gemma On-Device — Field Guide</title>
+<style>
+  :root {
+    --paper: #F6F4EF;
+    --panel: #FFFFFF;
+    --ink: #1B2A30;
+    --ink-soft: #45585F;
+    --line: #DCD8CF;
+    --blueprint: #2C5D69;
+    --blueprint-deep: #1E4650;
+    --amber: #C6852E;
+    --accent-a: #B5562E;
+    --accent-b: #2C5D69;
+    --accent-c: #6A6438;
+    --code-bg: #1B2A30;
+    --code-ink: #D9E4E2;
+    --shadow: 0 1px 2px rgba(27,42,48,.06), 0 8px 28px rgba(27,42,48,.07);
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+
+  body {
+    margin: 0;
+    background:
+      radial-gradient(circle at 12% -5%, rgba(44,93,105,.06), transparent 42%),
+      radial-gradient(circle at 98% 8%, rgba(198,133,46,.05), transparent 40%),
+      var(--paper);
+    color: var(--ink);
+    font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  .wrap { max-width: 760px; margin: 0 auto; padding: 0 28px; }
+
+  .mono {
+    font-family: ui-monospace, 'SF Mono', 'JetBrains Mono', 'Roboto Mono', Menlo, Consolas, monospace;
+  }
+
+  header.mast { padding: 74px 0 40px; border-bottom: 1px solid var(--line); }
+  .eyebrow {
+    font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+    font-size: 12px; letter-spacing: .22em; text-transform: uppercase;
+    color: var(--blueprint); margin: 0 0 20px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .eyebrow::before { content: ""; width: 26px; height: 1px; background: var(--blueprint); display: inline-block; }
+  h1 {
+    font-size: clamp(34px, 6vw, 52px);
+    line-height: 1.08; letter-spacing: -.012em;
+    margin: 0 0 22px; font-weight: 600;
+  }
+  h1 em { font-style: italic; color: var(--accent-a); }
+  .standfirst { font-size: 20px; color: var(--ink-soft); margin: 0; max-width: 60ch; }
+
+  .thesis {
+    margin: 44px 0; padding: 30px 32px;
+    background: var(--blueprint-deep); color: #EAF1F0;
+    border-radius: 14px; box-shadow: var(--shadow);
+  }
+  .thesis .label {
+    font-family: ui-monospace, Menlo, monospace;
+    font-size: 11px; letter-spacing: .2em; text-transform: uppercase;
+    color: #9CC2C0; margin: 0 0 12px;
+  }
+  .thesis p { margin: 0; font-size: 21px; line-height: 1.5; }
+  .thesis b { color: #F1C88A; font-weight: 600; }
+
+  section { padding: 46px 0; border-bottom: 1px solid var(--line); }
+  h2 { font-size: 27px; letter-spacing: -.01em; margin: 0 0 8px; font-weight: 600; }
+  .kicker {
+    font-family: ui-monospace, Menlo, monospace;
+    font-size: 12px; letter-spacing: .18em; text-transform: uppercase;
+    color: var(--amber); margin: 0 0 18px;
+  }
+  p { margin: 0 0 18px; }
+  p:last-child { margin-bottom: 0; }
+  .lead-in { color: var(--ink-soft); }
+  strong { font-weight: 600; }
+
+  .analogy {
+    border-left: 3px solid var(--amber);
+    padding: 4px 0 4px 20px; margin: 22px 0;
+    color: var(--ink-soft); font-style: italic;
+  }
+
+  .cards { display: grid; gap: 18px; margin-top: 8px; }
+  .card {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 14px; padding: 26px 28px;
+    box-shadow: var(--shadow); position: relative; overflow: hidden;
+  }
+  .card::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; }
+  .card.a::before { background: var(--accent-a); }
+  .card.b::before { background: var(--accent-b); }
+  .card.c::before { background: var(--accent-c); }
+
+  .card-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 4px; flex-wrap: wrap; }
+  .card-chip {
+    font-family: ui-monospace, Menlo, monospace;
+    font-size: 15px; font-weight: 600;
+    padding: 3px 10px; border-radius: 7px;
+    background: #EFEAE0; color: var(--ink);
+  }
+  .card.a .card-chip { background: #F6E2D8; color: #8A3E1F; }
+  .card.b .card-chip { background: #DBE8E9; color: #1E4650; }
+  .card.c .card-chip { background: #E8E7D3; color: #4E4A26; }
+  .card-name { font-size: 19px; font-weight: 600; }
+  .card-role {
+    font-family: ui-monospace, Menlo, monospace;
+    font-size: 11px; letter-spacing: .12em; text-transform: uppercase;
+    color: var(--ink-soft); margin-left: auto;
+  }
+  .card p { font-size: 16.5px; margin: 12px 0 0; }
+  .card .job { margin-top: 14px; font-size: 15px; color: var(--ink-soft); }
+  .card .job b { color: var(--ink); font-weight: 600; }
+
+  .flow { counter-reset: step; margin-top: 12px; }
+  .step {
+    display: grid; grid-template-columns: 52px 1fr; gap: 22px;
+    padding: 22px 0; border-top: 1px solid var(--line);
+  }
+  .step:first-child { border-top: none; }
+  .step .num {
+    counter-increment: step;
+    font-family: ui-monospace, Menlo, monospace;
+    font-size: 15px; font-weight: 600; color: var(--blueprint);
+  }
+  .step .num::before { content: counter(step, decimal-leading-zero); }
+  .step h3 { margin: 0 0 6px; font-size: 18px; font-weight: 600; }
+  .step p { margin: 0; font-size: 16px; color: var(--ink-soft); }
+  .step .who {
+    display: inline-block;
+    font-family: ui-monospace, Menlo, monospace;
+    font-size: 11px; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--blueprint); margin-top: 8px;
+  }
+
+  .snippet {
+    background: var(--code-bg); color: var(--code-ink);
+    border-radius: 12px; padding: 20px 22px;
+    font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+    font-size: 13.5px; line-height: 1.7;
+    overflow-x: auto; margin: 22px 0; box-shadow: var(--shadow);
+  }
+  .snippet .c { color: #7FA6A2; }
+  .snippet .k { color: #F1C88A; }
+
+  .rows { margin-top: 10px; }
+  .row {
+    display: grid; grid-template-columns: 190px 1fr; gap: 18px;
+    padding: 14px 0; border-top: 1px solid var(--line);
+    align-items: baseline;
+  }
+  .row:first-child { border-top: none; }
+  .row-name {
+    font-family: ui-monospace, Menlo, monospace;
+    font-size: 14px; font-weight: 600; color: var(--blueprint-deep);
+  }
+  .row-desc { font-size: 15.5px; color: var(--ink-soft); }
+  @media (max-width: 560px) { .row { grid-template-columns: 1fr; gap: 4px; } }
+
+  .callout {
+    background: #FBF7EE; border: 1px solid #ECDFC4;
+    border-radius: 12px; padding: 22px 24px; margin: 26px 0 0;
+  }
+  .callout .tag {
+    font-family: ui-monospace, Menlo, monospace;
+    font-size: 11px; letter-spacing: .16em; text-transform: uppercase;
+    color: var(--accent-a); margin: 0 0 8px;
+  }
+  .callout p { margin: 0; font-size: 16px; }
+
+  footer { padding: 50px 0 80px; text-align: center; color: var(--ink-soft); }
+  footer .mark {
+    font-family: ui-monospace, Menlo, monospace;
+    font-size: 12px; letter-spacing: .2em; text-transform: uppercase;
+    color: var(--blueprint);
+  }
+  footer p { margin: 14px 0 0; font-size: 16px; }
+
+  @media (prefers-reduced-motion: no-preference) {
+    section, header.mast > *, .thesis { animation: rise .6s ease both; }
+    section:nth-child(2){animation-delay:.04s}
+    @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="mast">
+    <p class="eyebrow">Wake · Pre-event dry run</p>
+    <h1>Running Gemma <em>offline</em> on your phone.</h1>
+    <p class="standfirst">Get Gemma 4 answering on an Android phone with no network, first with zero code to prove the hardware, then through the LiteRT-LM API to prove you can integrate it. Learning and assets only — none of this code goes into the hackathon repo.</p>
+  </header>
+
+  <div class="thesis">
+    <p class="label">The whole idea in one line</p>
+    <p>RAM is not the constraint; E2B is comfortable on 8 GB. <b>The backend is</b>, and it is phone-specific — so the choice of demo phone, not the code, is the real decision here.</p>
+  </div>
+
+  <section>
+    <p class="kicker">The runtime</p>
+    <h2>What LiteRT-LM actually is</h2>
+    <p class="lead-in">Getting Gemma to run offline on the phone is the highest-risk unknown, so <strong>de-risk it before the event.</strong></p>
+    <div class="rows">
+      <div class="row"><span class="row-name">LiteRT</span><span class="row-desc">Google's on-device ML runtime, the successor to TensorFlow Lite.</span></div>
+      <div class="row"><span class="row-name">LiteRT-LM</span><span class="row-desc">A layer on top, built only for LLMs: tokenization, KV-cache, chat sessions, streaming, GPU and NPU acceleration.</span></div>
+      <div class="row"><span class="row-name">MediaPipe LLM API</span><span class="row-desc">The older path, now maintenance-only. Google says new projects use LiteRT-LM, so target that.</span></div>
+      <div class="row"><span class="row-name">Model format</span><span class="row-desc">.litertlm files. Use litert-community/gemma-4-E2B-it-litert-lm from HuggingFace. E2B is smaller and faster, E4B is bigger and better.</span></div>
+    </div>
+    <p>Speed reality: E2B runs around 52 tokens/sec on the GPU (OpenCL) backend, but only 2 to 5 on CPU. GPU or NPU is what makes the demo feel instant. But the fast backends are not on every phone, which makes the choice of demo phone the biggest decision here.</p>
+  </section>
+
+  <section>
+    <p class="kicker">Read before choosing a phone</p>
+    <h2>Backend availability is the landmine</h2>
+    <p class="lead-in">The GPU backend needs <strong>OpenCL, which many phones do not expose.</strong></p>
+    <div class="rows">
+      <div class="row"><span class="row-name">Pixel (Tensor G3/G4)</span><span class="row-desc">No OpenCL. GPU backend silently fails, confirmed by open issues. Falls back to slow CPU.</span></div>
+      <div class="row"><span class="row-name">Some Samsung/Exynos</span><span class="row-desc">GPU init fails; hit or miss.</span></div>
+      <div class="row"><span class="row-name">Snapdragon 8-series</span><span class="row-desc">Best bet. Most likely to expose OpenCL, and the 8 Elite has an NPU reachable via the Qualcomm QNN delegate, which is even faster.</span></div>
+    </div>
+    <p>Backend priority to aim for: NPU via QNN on a Snapdragon 8 Elite, then GPU via OpenCL, then CPU via XNNPack as the streaming 2-to-5 tokens/sec floor.</p>
+    <div class="callout">
+      <p class="tag">Why this matters</p>
+      <p>CPU at 2 to 5 tokens/sec is not dead with streaming and short answers, but it is not the snappy demo. Know your phone's backend from the Stage 1 test, never discover it on stage. Plan the script around whatever backend your actual phone gives you.</p>
+    </div>
+  </section>
+
+  <section>
+    <p class="kicker">Stage 0</p>
+    <h2>Prep the phone, once</h2>
+    <p class="lead-in">Ten minutes of setup that <strong>everything else depends on.</strong></p>
+    <div class="flow">
+      <div class="step"><div class="num"></div><div>
+        <h3>Check RAM and chipset</h3>
+        <p>Settings then About phone. Want 8 GB or more. Snapdragon 8-series is the one you want; Pixel or Tensor means CPU only.</p>
+      </div></div>
+      <div class="step"><div class="num"></div><div>
+        <h3>Enable developer options</h3>
+        <p>Settings, About phone, tap Build number seven times.</p>
+      </div></div>
+      <div class="step"><div class="num"></div><div>
+        <h3>Turn on USB debugging</h3>
+        <p>Settings, Developer options, USB debugging on.</p>
+      </div></div>
+      <div class="step"><div class="num"></div><div>
+        <h3>Install adb on the laptop</h3>
+        <p>On WSL or Linux, apt install adb, plug in, run adb devices, accept the trust prompt on the phone.</p>
+      </div></div>
+    </div>
+  </section>
+
+  <section>
+    <p class="kicker">Stage 1 · 15 minutes</p>
+    <h2>Zero-code proof it runs</h2>
+    <p class="lead-in">Confirm the hardware can run Gemma at usable speed <strong>before writing anything.</strong></p>
+    <div class="flow">
+      <div class="step"><div class="num"></div><div>
+        <h3>Install AI Edge Gallery</h3>
+        <p>Google's official runner app, from the Play Store or the github.com/google-ai-edge/gallery releases.</p>
+      </div></div>
+      <div class="step"><div class="num"></div><div>
+        <h3>Pick a Gemma model</h3>
+        <p>Choose the LLM chat task, then the smallest Gemma, around E2B. Accept the HuggingFace Gemma license and download on home wifi, not at the venue.</p>
+      </div></div>
+      <div class="step"><div class="num"></div><div>
+        <h3>Select GPU</h3>
+        <p>Try to select the GPU backend. If it is greyed out or errors, your phone has no OpenCL and is running CPU. Note which backend actually ran.</p>
+      </div></div>
+      <div class="step"><div class="num"></div><div>
+        <h3>Airplane mode, then chat</h3>
+        <p>Confirm it answers with no network, note the tokens/sec, and check it does not overheat or crash after a minute.</p>
+      </div></div>
+      <div class="step"><div class="num"></div><div>
+        <h3>Test all three phones</h3>
+        <p>The fastest phone is your demo device. Record each one's chipset, backend, and tokens/sec.</p>
+      </div></div>
+    </div>
+    <div class="callout">
+      <p class="tag">Decision gate</p>
+      <p>If any phone gets GPU or NPU and feels snappy, commit to Android with that device. If the best phone is CPU-only, Android still works but keep LLM answers short and lean on the deterministic composer. If nothing is usable or all crash, fall back to the desktop plan.</p>
+    </div>
+  </section>
+
+  <section>
+    <p class="kicker">Stage 2 · 1 to 2 hours</p>
+    <h2>Prove you can drive the API</h2>
+    <p class="lead-in">Learn the exact LiteRT-LM Android API so on the day you <strong>rewrite the integration fresh in about 30 minutes</strong> instead of debugging blind.</p>
+    <div class="flow">
+      <div class="step"><div class="num"></div><div>
+        <h3>Get the model onto the phone</h3>
+        <p>Download the .litertlm from litert-community/gemma-4-E2B-it-litert-lm, accept the license, then push it.</p>
+      </div></div>
+      <div class="step"><div class="num"></div><div>
+        <h3>Build the official sample</h3>
+        <p>Clone github.com/google-ai-edge/LiteRT-LM, open the Android sample in Android Studio, let Gradle sync so it pulls the dependency, and run over USB.</p>
+      </div></div>
+      <div class="step"><div class="num"></div><div>
+        <h3>Read the lines that matter</h3>
+        <p>Find model load, backend selection with a support check and CPU fallback, session creation, and the streaming generate call. That is the whole API you will reuse.</p>
+      </div></div>
+      <div class="step"><div class="num"></div><div>
+        <h3>Modify one thing</h3>
+        <p>Feed it a few fake captured events as context and ask "what was I just doing?" Watch it answer grounded in the context. Your hackathon AI path is proven.</p>
+      </div></div>
+    </div>
+    <div class="snippet">
+<span class="c"># push the model where the sample expects it</span><br>
+adb shell mkdir -p /data/local/tmp/llm/<br>
+adb push gemma-4-E2B-it.litertlm /data/local/tmp/llm/<br>
+<span class="c"># match the exact filename/path in the sample README</span>
+    </div>
+    <div class="callout">
+      <p class="tag">Do not copy from memory</p>
+      <p>The LiteRT-LM API is young and class and method names shift between versions. The sample app on the tag you clone is the only trustworthy reference. Read it, not old blog posts, and take the Gradle coordinate from its build.gradle.</p>
+    </div>
+  </section>
+
+  <section>
+    <p class="kicker">Before you sleep</p>
+    <h2>The pre-event checklist</h2>
+    <p class="lead-in">Learning and assets only. <strong>No project code before 10:30.</strong></p>
+    <div class="rows">
+      <div class="row"><span class="row-name">Demo phone</span><span class="row-desc">Chosen, chipset noted, backend confirmed as GPU or NPU ideal, CPU acceptable but slow, 8 GB or more RAM, adb working.</span></div>
+      <div class="row"><span class="row-name">Model files</span><span class="row-desc">.litertlm for E2B pushed to the phone, E4B optional. Zero downloads needed at the venue.</span></div>
+      <div class="row"><span class="row-name">The sample run</span><span class="row-desc">Run once on GPU, with the load, backend, session, and generate calls read and understood.</span></div>
+      <div class="row"><span class="row-name">Node dump</span><span class="row-desc">uiautomator dump eyeballed on Chrome, WhatsApp, Gmail to confirm rich text on your build.</span></div>
+      <div class="row"><span class="row-name">Offline build</span><span class="row-desc">One full build at home so Gradle caches every dependency locally. Assume venue wifi is unusable.</span></div>
+      <div class="row"><span class="row-name">License done</span><span class="row-desc">Gemma HuggingFace license accepted once, now, not at 10:30 AM.</span></div>
+    </div>
+  </section>
+
+  <section>
+    <p class="kicker">Gotchas</p>
+    <h2>The traps to remember</h2>
+    <div class="rows">
+      <div class="row"><span class="row-name">GPU vs CPU</span><span class="row-desc">If speed is 2 to 5 tokens/sec you are on CPU. First check the backend is set to GPU, but if your phone has no OpenCL, CPU is all you get and there is no fix.</span></div>
+      <div class="row"><span class="row-name">Cold start</span><span class="row-desc">First load is slow as weights move into RAM. That is one-time per app start, not per message. Do not panic at cold start.</span></div>
+      <div class="row"><span class="row-name">Venue wifi</span><span class="row-desc">Assume unusable. Models, and the Gradle dependency cache from one full home build, must be local beforehand.</span></div>
+    </div>
+  </section>
+
+  <footer>
+    <p class="mark">Test tonight</p>
+    <p>Fifteen minutes with the Gallery app tells you if this whole plan is real on your hardware. Start there.</p>
+  </footer>
+
+</div>
+</body>
+</html>

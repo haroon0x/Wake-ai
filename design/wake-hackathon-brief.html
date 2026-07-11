@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wake — Hackathon Brief</title>
+<style>
+  :root {
+    --paper: #F6F4EF;
+    --panel: #FFFFFF;
+    --ink: #1B2A30;
+    --ink-soft: #45585F;
+    --line: #DCD8CF;
+    --blueprint: #2C5D69;
+    --blueprint-deep: #1E4650;
+    --amber: #C6852E;
+    --accent-a: #B5562E;
+    --accent-b: #2C5D69;
+    --accent-c: #6A6438;
+    --code-bg: #1B2A30;
+    --code-ink: #D9E4E2;
+    --shadow: 0 1px 2px rgba(27,42,48,.06), 0 8px 28px rgba(27,42,48,.07);
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+
+  body {
+    margin: 0;
+    background:
+      radial-gradient(circle at 12% -5%, rgba(44,93,105,.06), transparent 42%),
+      radial-gradient(circle at 98% 8%, rgba(198,133,46,.05), transparent 40%),
+      var(--paper);
+    color: var(--ink);
+    font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  .wrap { max-width: 760px; margin: 0 auto; padding: 0 28px; }
+
+  .mono {
+    font-family: ui-monospace, 'SF Mono', 'JetBrains Mono', 'Roboto Mono', Menlo, Consolas, monospace;
+  }
+
+  header.mast { padding: 74px 0 40px; border-bottom: 1px solid var(--line); }
+  .eyebrow {
+    font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+    font-size: 12px; letter-spacing: .22em; text-transform: uppercase;
+    color: var(--blueprint); margin: 0 0 20px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .eyebrow::before { content: ""; width: 26px; height: 1px; background: var(--blueprint); display: inline-block; }
+  h1 {
+    font-size: clamp(34px, 6vw, 52px);
+    line-height: 1.08; letter-spacing: -.012em;
+    margin: 0 0 22px; font-weight: 600;
+  }
+  h1 em { font-style: italic; color: var(--accent-a); }
+  .standfirst { font-size: 20px; color: var(--ink-soft); margin: 0; max-width: 60ch; }
+
+  .thesis {
+    margin: 44px 0; padding: 30px 32px;
+    background: var(--blueprint-deep); color: #EAF1F0;
+    border-radius: 14px; box-shadow: var(--shadow);
+  }
+  .thesis .label {
+    font-family: ui-monospace, Menlo, monospace;
+    font-size: 11px; letter-spacing: .2em; text-transform: uppercase;
+    color: #9CC2C0; margin: 0 0 12px;
+  }
+  .thesis p { margin: 0; font-size: 21px; line-height: 1.5; }
+  .thesis b { color: #F1C88A; font-weight: 600; }
+
+  section { padding: 46px 0; border-bottom: 1px solid var(--line); }
+  h2 { font-size: 27px; letter-spacing: -.01em; margin: 0 0 8px; font-weight: 600; }
+  .kicker {
+    font-family: ui-monospace, Menlo, monospace;
+    font-size: 12px; letter-spacing: .18em; text-transform: uppercase;
+    color: var(--amber); margin: 0 0 18px;
+  }
+  p { margin: 0 0 18px; }
+  p:last-child { margin-bottom: 0; }
+  .lead-in { color: var(--ink-soft); }
+  strong { font-weight: 600; }
+
+  .analogy {
+    border-left: 3px solid var(--amber);
+    padding: 4px 0 4px 20px; margin: 22px 0;
+    color: var(--ink-soft); font-style: italic;
+  }
+
+  .cards { display: grid; gap: 18px; margin-top: 8px; }
+  .card {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 14px; padding: 26px 28px;
+    box-shadow: var(--shadow); position: relative; overflow: hidden;
+  }
+  .card::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; }
+  .card.a::before { background: var(--accent-a); }
+  .card.b::before { background: var(--accent-b); }
+  .card.c::before { background: var(--accent-c); }
+
+  .card-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 4px; flex-wrap: wrap; }
+  .card-chip {
+    font-family: ui-monospace, Menlo, monospace;
+    font-size: 15px; font-weight: 600;
+    padding: 3px 10px; border-radius: 7px;
+    background: #EFEAE0; color: var(--ink);
+  }
+  .card.a .card-chip { background: #F6E2D8; color: #8A3E1F; }
+  .card.b .card-chip { background: #DBE8E9; color: #1E4650; }
+  .card.c .card-chip { background: #E8E7D3; color: #4E4A26; }
+  .card-name { font-size: 19px; font-weight: 600; }
+  .card-role {
+    font-family: ui-monospace, Menlo, monospace;
+    font-size: 11px; letter-spacing: .12em; text-transform: uppercase;
+    color: var(--ink-soft); margin-left: auto;
+  }
+  .card p { font-size: 16.5px; margin: 12px 0 0; }
+  .card .job { margin-top: 14px; font-size: 15px; color: var(--ink-soft); }
+  .card .job b { color: var(--ink); font-weight: 600; }
+
+  .flow { counter-reset: step; margin-top: 12px; }
+  .step {
+    display: grid; grid-template-columns: 52px 1fr; gap: 22px;
+    padding: 22px 0; border-top: 1px solid var(--line);
+  }
+  .step:first-child { border-top: none; }
+  .step .num {
+    counter-increment: step;
+    font-family: ui-monospace, Menlo, monospace;
+    font-size: 15px; font-weight: 600; color: var(--blueprint);
+  }
+  .step .num::before { content: counter(step, decimal-leading-zero); }
+  .step h3 { margin: 0 0 6px; font-size: 18px; font-weight: 600; }
+  .step p { margin: 0; font-size: 16px; color: var(--ink-soft); }
+  .step .who {
+    display: inline-block;
+    font-family: ui-monospace, Menlo, monospace;
+    font-size: 11px; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--blueprint); margin-top: 8px;
+  }
+
+  .snippet {
+    background: var(--code-bg); color: var(--code-ink);
+    border-radius: 12px; padding: 20px 22px;
+    font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+    font-size: 13.5px; line-height: 1.7;
+    overflow-x: auto; margin: 22px 0; box-shadow: var(--shadow);
+  }
+  .snippet .c { color: #7FA6A2; }
+  .snippet .k { color: #F1C88A; }
+
+  .rows { margin-top: 10px; }
+  .row {
+    display: grid; grid-template-columns: 190px 1fr; gap: 18px;
+    padding: 14px 0; border-top: 1px solid var(--line);
+    align-items: baseline;
+  }
+  .row:first-child { border-top: none; }
+  .row-name {
+    font-family: ui-monospace, Menlo, monospace;
+    font-size: 14px; font-weight: 600; color: var(--blueprint-deep);
+  }
+  .row-desc { font-size: 15.5px; color: var(--ink-soft); }
+  @media (max-width: 560px) { .row { grid-template-columns: 1fr; gap: 4px; } }
+
+  .callout {
+    background: #FBF7EE; border: 1px solid #ECDFC4;
+    border-radius: 12px; padding: 22px 24px; margin: 26px 0 0;
+  }
+  .callout .tag {
+    font-family: ui-monospace, Menlo, monospace;
+    font-size: 11px; letter-spacing: .16em; text-transform: uppercase;
+    color: var(--accent-a); margin: 0 0 8px;
+  }
+  .callout p { margin: 0; font-size: 16px; }
+
+  .part-divider { padding: 60px 0 10px; text-align: center; }
+  .part-divider .mark {
+    font-family: ui-monospace, Menlo, monospace;
+    font-size: 12px; letter-spacing: .2em; text-transform: uppercase;
+    color: var(--amber);
+  }
+
+  footer { padding: 50px 0 80px; text-align: center; color: var(--ink-soft); }
+  footer .mark {
+    font-family: ui-monospace, Menlo, monospace;
+    font-size: 12px; letter-spacing: .2em; text-transform: uppercase;
+    color: var(--blueprint);
+  }
+  footer p { margin: 14px 0 0; font-size: 16px; }
+
+  @media (prefers-reduced-motion: no-preference) {
+    section, header.mast > *, .thesis { animation: rise .6s ease both; }
+    section:nth-child(2){animation-delay:.04s}
+    @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="mast">
+    <p class="eyebrow">Google DeepMind Bangalore Hackathon · Team Brief</p>
+    <h1>Wake: the phone that <em>remembers</em>, then acts.</h1>
+    <p class="standfirst">A fully local AI memory-and-recovery agent for Android. It remembers what you saw, notices what you abandoned, and acts to get you back on track — entirely on-device. This brief holds the whole plan and the Gemma-on-phone dry run.</p>
+  </header>
+
+  <div class="thesis">
+    <p class="label">The whole idea in one line</p>
+    <p>Desktop screen-memory is a solved, crowded space. Nobody has built it for the Android phone, and nobody makes it <b>act on the memory instead of just searching it</b> — that gap is the whole bet.</p>
+  </div>
+
+  <section>
+    <p class="kicker">Why it wins</p>
+    <h2>Reading the scoreboard</h2>
+    <p class="lead-in">Judging weights are <strong>Creativity 35%, Live Demo 25%, India Impact 25%, Technical Depth 15%.</strong> The plan is built to score on the two biggest.</p>
+    <p>Recall and Rewind exist on desktop, so a memory-search app reads as familiar. Wake's difference is that it does not just search memory — it acts on it. That is the never-seen-before angle the creativity score rewards.</p>
+    <p>The Gemma prize sets the real bar: "if you can draw your agent as a single straight arrow from input to output, it isn't an agent yet." A plain capture then retrieve then answer pipeline fails that test. Wake ships the full loop instead.</p>
+    <div class="rows">
+      <div class="row"><span class="row-name">Sense</span><span class="row-desc">Continuously capture screen text, notifications, and app activity on-device.</span></div>
+      <div class="row"><span class="row-name">Decide</span><span class="row-desc">Gemma reads recent sessions and spots an abandoned task or an unanswered message.</span></div>
+      <div class="row"><span class="row-name">Act</span><span class="row-desc">Restore the context you lost, or draft the follow-up you forgot.</span></div>
+      <div class="row"><span class="row-name">Check</span><span class="row-desc">Show the plan before acting, admit capture gaps honestly, defer to the human when unsure.</span></div>
+    </div>
+    <p>India impact is structural, not decorative: spotty connectivity, high data costs, and privacy-sensitive users make on-device the only viable architecture. A phone answering in airplane mode makes that visible in three seconds.</p>
+  </section>
+
+  <section>
+    <p class="kicker">Staying legal</p>
+    <h2>The rules, and how we obey them</h2>
+    <p class="lead-in">The event disqualifies presented-as-new work that isn't. <strong>Everything in the demo is built day-of.</strong></p>
+    <div class="rows">
+      <div class="row"><span class="row-name">Fresh repo</span><span class="row-desc">Create a new public repo at the event. Never copy code from the old wake repo. Do not even open it day-of.</span></div>
+      <div class="row"><span class="row-name">Commit often</span><span class="row-desc">Every 30 to 45 minutes, so the git history itself proves the work happened during the event.</span></div>
+      <div class="row"><span class="row-name">Prep is learning only</span><span class="row-desc">Allowed before the event: reading docs, a throwaway Gemma dry-run app that is never presented, and downloading model weights.</span></div>
+      <div class="row"><span class="row-name">Dodge the anti-list</span><span class="row-desc">Not a chatbot, not RAG-over-docs, not a dashboard. Keep the timeline screen secondary; never say "RAG" in the pitch.</span></div>
+    </div>
+  </section>
+
+  <section>
+    <p class="kicker">Scope discipline</p>
+    <h2>What we are deliberately not building</h2>
+    <p class="lead-in">A sideloaded demo does not need the production spec. <strong>Cut everything that does not show on stage.</strong></p>
+    <p>Gone for the hackathon: encryption at rest, Play disclosure screens, redaction, retention settings, an excluded-apps UI (hardcode a small list instead), event-triggered screenshots and OCR, the markdown summary layer, embeddings, daily recap, OEM background-kill hardening, and the manual save / share sheet.</p>
+  </section>
+
+  <section>
+    <p class="kicker">How it fits together</p>
+    <h2>The architecture</h2>
+    <p class="lead-in">Three capture sources feed one local store; a router splits questions between a <strong>deterministic composer and Gemma.</strong></p>
+    <div class="snippet">
+<span class="c"># Capture &gt; store &gt; answer, all on-device</span><br>
+NotificationListenerService ─┐<br>
+AccessibilityService         ├─&gt; throttle/dedup ─&gt; Room (SQLite + FTS5) ─&gt; sessions<br>
+&nbsp;&nbsp;(node-tree screen text)  ─┘<br>
+UsageStatsManager (live query at answer time)<br>
+<br>
+<span class="k">query router (heuristics)</span><br>
+&nbsp;&nbsp;├─ structured &nbsp;&gt; deterministic composer (SQL + templates)<br>
+&nbsp;&nbsp;└─ open &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&gt; FTS5 retrieval &gt; Gemma (LiteRT-LM, GPU) &gt; grounded answer<br>
+<br>
+<span class="k">agent loop (the prize-winner)</span><br>
+&nbsp;&nbsp;Gemma scans recent sessions &gt; detects abandoned task /<br>
+&nbsp;&nbsp;unanswered message &gt; proposes action &gt; user confirms &gt; acts
+    </div>
+    <p>Stack: Kotlin, Jetpack Compose, Room with FTS5, NotificationListenerService, AccessibilityService, UsageStatsManager (use AppOpsManager for the permission check, because queryUsageStats fails silently), and LiteRT-LM running Gemma 4 E2B on the GPU backend.</p>
+    <div class="callout">
+      <p class="tag">Verified before the event</p>
+      <p>FLAG_SECURE does not block accessibility text, so the moat is not blocked, but keep banking apps excluded by design as the trust story. Chrome, WhatsApp, and Gmail expose rich node trees; Flutter and canvas apps expose only sparse text, so use Instagram as the distraction, never as a read target. For notifications, use extractMessagingStyleFromNotification for real per-message senders instead of hand-parsing the collapsed text.</p>
+    </div>
+  </section>
+
+  <section>
+    <p class="kicker">Who does what</p>
+    <h2>Three people, three tracks</h2>
+    <p class="lead-in">Freeze the schema together first, <strong>then split by dependency</strong> so nobody blocks anybody.</p>
+    <div class="cards">
+      <div class="card a">
+        <div class="card-head">
+          <span class="card-chip">A</span>
+          <span class="card-name">Capture</span>
+          <span class="card-role">Android internals</span>
+        </div>
+        <p>Room schema plus FTS5 first, then the NotificationListener with MessagingStyle sender extraction, then AccessibilityService capture with throttle and dedup, then session grouping.</p>
+        <p class="job"><b>Give this to:</b> the strongest Android-internals developer.</p>
+      </div>
+      <div class="card b">
+        <div class="card-head">
+          <span class="card-chip">B</span>
+          <span class="card-name">AI</span>
+          <span class="card-role">Composer + Gemma</span>
+        </div>
+        <p>The deterministic composer first, so the demo floor is secured by about 1pm with zero LLM. Then Gemma via LiteRT-LM on GPU, the query router heuristics, and grounded answering.</p>
+        <p class="job"><b>Give this to:</b> whoever did the pre-event Gemma dry run.</p>
+      </div>
+      <div class="card c">
+        <div class="card-head">
+          <span class="card-chip">C</span>
+          <span class="card-name">UI + Agent + Demo</span>
+          <span class="card-role">The closer</span>
+        </div>
+        <p>The Compose ask screen and a secondary timeline, then the agent loop built with B, then the demo script, the one-minute video, the submission form, and rehearsal. Floats to unblock others.</p>
+        <p class="job"><b>Give this to:</b> the best presenter who can also code UI.</p>
+      </div>
+    </div>
+    <div class="callout">
+      <p class="tag">Sync points</p>
+      <p>Schema freeze at 11:15. Capture-to-composer integration at 1:45. Full-pipeline test at 3:30. Feature freeze at 4:15. Two full rehearsals before 5:00.</p>
+    </div>
+  </section>
+
+  <section>
+    <p class="kicker">The clock</p>
+    <h2>Hour by hour, 10:30 to 5:00</h2>
+    <p class="lead-in">The order is chosen so a <strong>working demo exists by early afternoon,</strong> before the risky parts start.</p>
+    <div class="flow">
+      <div class="step"><div class="num"></div><div>
+        <h3>10:30 to 11:15 — Foundation</h3>
+        <p>Fresh repo, project skeleton, Room schema with sender and session_id, the FTS5 table, permissions plumbing.</p>
+      </div></div>
+      <div class="step"><div class="num"></div><div>
+        <h3>11:15 to 12:00 — Notification memory</h3>
+        <p>NotificationListenerService with MessagingStyle sender extraction, dedup, and the ongoing-notification filter.</p>
+      </div></div>
+      <div class="step"><div class="num"></div><div>
+        <h3>12:00 to 1:15 — The moat</h3>
+        <p>AccessibilityService node-tree capture, throttled and deduped, with hardcoded exclusions and session grouping.</p>
+      </div></div>
+      <div class="step"><div class="num"></div><div>
+        <h3>1:45 to 2:30 — Demo floor secured</h3>
+        <p>The deterministic composer: "what was I just doing", "what did X send", "before I opened Y". Works with zero LLM.</p>
+        <span class="who">Magic moment ships here</span>
+      </div></div>
+      <div class="step"><div class="num"></div><div>
+        <h3>2:30 to 3:45 — Open questions</h3>
+        <p>Gemma via LiteRT-LM on GPU, model already on device: retrieval, grounded answering, query router heuristics.</p>
+      </div></div>
+      <div class="step"><div class="num"></div><div>
+        <h3>3:45 to 4:30 — The prize-winning loop</h3>
+        <p>Agent scans recent sessions, detects an abandoned task or unanswered message, proposes and then acts.</p>
+      </div></div>
+      <div class="step"><div class="num"></div><div>
+        <h3>4:30 to 5:00 — Submission</h3>
+        <p>Minimal UI polish, record the one-minute video, submit, rehearse.</p>
+      </div></div>
+    </div>
+    <div class="callout">
+      <p class="tag">Triage rule</p>
+      <p>If you are behind at 3:45, cut the agent loop to one hardcoded action: "resume what I abandoned" reopens the last non-distraction session's app and URL. One reliable act beats three flaky ones.</p>
+    </div>
+  </section>
+
+  <section>
+    <p class="kicker">The three minutes</p>
+    <h2>The demo script</h2>
+    <p class="lead-in">The whole demo runs in <strong>airplane mode,</strong> shown to the judges, start to finish.</p>
+    <div class="flow">
+      <div class="step"><div class="num"></div><div>
+        <h3>Set the frame</h3>
+        <p>Airplane mode on, held up. "No servers exist. Watch the status bar the whole demo."</p>
+      </div></div>
+      <div class="step"><div class="num"></div><div>
+        <h3>Live activity</h3>
+        <p>Before airplane mode: receive a WhatsApp message. Then browse Chrome to a page with a visible code, open Gmail, get distracted into Instagram.</p>
+      </div></div>
+      <div class="step"><div class="num"></div><div>
+        <h3>Ask what just happened</h3>
+        <p>"What was I just doing?" returns an exact timeline answer.</p>
+      </div></div>
+      <div class="step"><div class="num"></div><div>
+        <h3>The exactness punchline</h3>
+        <p>"What was the registration code I saw?" returns the character-perfect string. "Node tree, not OCR — it can't be wrong."</p>
+      </div></div>
+      <div class="step"><div class="num"></div><div>
+        <h3>Wake acts first</h3>
+        <p>"You opened Instagram mid-task. Resume?" One tap reopens Chrome on the exact page and surfaces the pending WhatsApp reply with a draft.</p>
+      </div></div>
+      <div class="step"><div class="num"></div><div>
+        <h3>Close</h3>
+        <p>"Everything you saw ran on this phone in airplane mode. Millions of Indians on spotty networks don't need a data center to have memory."</p>
+      </div></div>
+    </div>
+    <div class="callout">
+      <p class="tag">Q&amp;A prep</p>
+      <p>Banking apps are excluded by design, not a limitation. Node-tree capture costs a fraction of the battery of screenshots. iOS has no equivalent APIs, which is exactly why Android-native is the moat.</p>
+    </div>
+  </section>
+
+  <section>
+    <p class="kicker">What can go wrong</p>
+    <h2>Risks, and the answer to each</h2>
+    <div class="rows">
+      <div class="row"><span class="row-name">Gemma eats the day</span><span class="row-desc">Killed by the pre-event dry run. The deterministic composer is the in-demo fallback.</span></div>
+      <div class="row"><span class="row-name">CPU by mistake</span><span class="row-desc">E2B on CPU is 2 to 5 tokens/sec, unusable. Confirm the GPU or NPU backend is active in the dry run.</span></div>
+      <div class="row"><span class="row-name">Event flood</span><span class="row-desc">Accessibility events swamp the DB. Throttle window plus hash dedup, budgeted 75 minutes.</span></div>
+      <div class="row"><span class="row-name">Venue wifi</span><span class="row-desc">Assume unusable. Model weights cached on the phone beforehand, zero downloads day-of.</span></div>
+      <div class="row"><span class="row-name">Hallucination on stage</span><span class="row-desc">Structured questions route to the deterministic composer. Only one open question in the script.</span></div>
+      <div class="row"><span class="row-name">Phone dies</span><span class="row-desc">Backup phone if available; the APK also lives on a teammate's device.</span></div>
+    </div>
+  </section>
+
+  <section>
+    <p class="kicker">Test before the day</p>
+    <h2>Assumptions still to verify</h2>
+    <p class="lead-in">Research resolved several. <strong>These four are still live bets</strong>, in priority order.</p>
+    <div class="rows">
+      <div class="row"><span class="row-name">1 · Gemma speed</span><span class="row-desc">Gemma 4 E2B on the real demo phone, GPU backend, via LiteRT-LM. Measure tokens/sec and load time. Now the top risk.</span></div>
+      <div class="row"><span class="row-name">2 · Node quality</span><span class="row-desc">uiautomator dump on Chrome, WhatsApp, and Gmail confirms rich text on your device build.</span></div>
+      <div class="row"><span class="row-name">3 · MessagingStyle</span><span class="row-desc">Confirm real per-message sender and text on your WhatsApp version.</span></div>
+      <div class="row"><span class="row-name">4 · Draft insert</span><span class="row-desc">ACTION_SET_TEXT into WhatsApp's input; fallback is clipboard plus ACTION_PASTE.</span></div>
+    </div>
+  </section>
+
+  <div class="part-divider">
+    <p class="mark">Part Two · The Gemma dry run</p>
+  </div>
+
+  <section>
+    <p class="kicker">The runtime</p>
+    <h2>What LiteRT-LM actually is</h2>
+    <p class="lead-in">Getting Gemma to run offline on the phone is the highest-risk unknown, so <strong>de-risk it before the event.</strong></p>
+    <div class="rows">
+      <div class="row"><span class="row-name">LiteRT</span><span class="row-desc">Google's on-device ML runtime, the successor to TensorFlow Lite.</span></div>
+      <div class="row"><span class="row-name">LiteRT-LM</span><span class="row-desc">A layer on top, built only for LLMs: tokenization, KV-cache, chat sessions, streaming, GPU and NPU acceleration.</span></div>
+      <div class="row"><span class="row-name">MediaPipe LLM API</span><span class="row-desc">The older path, now maintenance-only. Google says new projects use LiteRT-LM, so target that.</span></div>
+      <div class="row"><span class="row-name">Model format</span><span class="row-desc">.litertlm files. Use litert-community/gemma-4-E2B-it-litert-lm from HuggingFace. E2B is smaller and faster, E4B is bigger and better.</span></div>
+    </div>
+    <p>Speed reality: E2B runs around 52 tokens/sec on the GPU (OpenCL) backend, but only 2 to 5 on CPU. GPU or NPU is what makes the demo feel instant. But the fast backends are not on every phone, which makes the choice of demo phone the biggest decision here.</p>
+  </section>
+
+  <section>
+    <p class="kicker">Read before choosing a phone</p>
+    <h2>Backend availability is the landmine</h2>
+    <p class="lead-in">The GPU backend needs <strong>OpenCL, which many phones do not expose.</strong></p>
+    <div class="rows">
+      <div class="row"><span class="row-name">Pixel (Tensor G3/G4)</span><span class="row-desc">No OpenCL. GPU backend silently fails, confirmed by open issues. Falls back to slow CPU.</span></div>
+      <div class="row"><span class="row-name">Some Samsung/Exynos</span><span class="row-desc">GPU init fails; hit or miss.</span></div>
+      <div class="row"><span class="row-name">Snapdragon 8-series</span><span class="row-desc">Best bet. Most likely to expose OpenCL, and the 8 Elite has an NPU reachable via the Qualcomm QNN delegate, which is even faster.</span></div>
+    </div>
+    <p>Backend priority to aim for: NPU via QNN on a Snapdragon 8 Elite, then GPU via OpenCL, then CPU via XNNPack as the streaming 2-to-5 tokens/sec floor.</p>
+    <div class="callout">
+      <p class="tag">Why this matters</p>
+      <p>RAM is not the constraint; E2B is comfortable on 8 GB. The backend is, and it is phone-specific. CPU at 2 to 5 tokens/sec is not dead with streaming and short answers, but it is not the snappy demo. Plan the script around whatever backend your actual phone gives you.</p>
+    </div>
+  </section>
+
+  <section>
+    <p class="kicker">Stage 0</p>
+    <h2>Prep the phone, once</h2>
+    <div class="flow">
+      <div class="step"><div class="num"></div><div>
+        <h3>Check RAM and chipset</h3>
+        <p>Settings then About phone. Want 8 GB or more. Snapdragon 8-series is the one you want; Pixel or Tensor means CPU only.</p>
+      </div></div>
+      <div class="step"><div class="num"></div><div>
+        <h3>Enable developer options</h3>
+        <p>Settings, About phone, tap Build number seven times.</p>
+      </div></div>
+      <div class="step"><div class="num"></div><div>
+        <h3>Turn on USB debugging</h3>
+        <p>Settings, Developer options, USB debugging on.</p>
+      </div></div>
+      <div class="step"><div class="num"></div><div>
+        <h3>Install adb on the laptop</h3>
+        <p>On WSL or Linux, apt install adb, plug in, run adb devices, accept the trust prompt on the phone.</p>
+      </div></div>
+    </div>
+  </section>
+
+  <section>
+    <p class="kicker">Stage 1 · 15 minutes</p>
+    <h2>Zero-code proof it runs</h2>
+    <p class="lead-in">Confirm the hardware can run Gemma at usable speed <strong>before writing anything.</strong></p>
+    <div class="flow">
+      <div class="step"><div class="num"></div><div>
+        <h3>Install AI Edge Gallery</h3>
+        <p>Google's official runner app, from the Play Store or the github.com/google-ai-edge/gallery releases.</p>
+      </div></div>
+      <div class="step"><div class="num"></div><div>
+        <h3>Pick a Gemma model</h3>
+        <p>Choose the LLM chat task, then the smallest Gemma, around E2B. Accept the HuggingFace Gemma license and download on home wifi, not at the venue.</p>
+      </div></div>
+      <div class="step"><div class="num"></div><div>
+        <h3>Select GPU</h3>
+        <p>Try to select the GPU backend. If it is greyed out or errors, your phone has no OpenCL and is running CPU. Note which backend actually ran.</p>
+      </div></div>
+      <div class="step"><div class="num"></div><div>
+        <h3>Airplane mode, then chat</h3>
+        <p>Confirm it answers with no network, note the tokens/sec, and check it does not overheat or crash after a minute.</p>
+      </div></div>
+      <div class="step"><div class="num"></div><div>
+        <h3>Test all three phones</h3>
+        <p>The fastest phone is your demo device. Record each one's chipset, backend, and tokens/sec.</p>
+      </div></div>
+    </div>
+    <div class="callout">
+      <p class="tag">Decision gate</p>
+      <p>If any phone gets GPU or NPU and feels snappy, commit to Android with that device. If the best phone is CPU-only, Android still works but keep LLM answers short and lean on the composer. If nothing is usable or all crash, fall back to the desktop plan.</p>
+    </div>
+  </section>
+
+  <section>
+    <p class="kicker">Stage 2 · 1 to 2 hours</p>
+    <h2>Prove you can drive the API</h2>
+    <p class="lead-in">Learn the exact LiteRT-LM Android API so on the day you <strong>rewrite the integration fresh in about 30 minutes</strong> instead of debugging blind.</p>
+    <div class="flow">
+      <div class="step"><div class="num"></div><div>
+        <h3>Get the model onto the phone</h3>
+        <p>Download the .litertlm from litert-community/gemma-4-E2B-it-litert-lm, accept the license, then push it.</p>
+      </div></div>
+      <div class="step"><div class="num"></div><div>
+        <h3>Build the official sample</h3>
+        <p>Clone github.com/google-ai-edge/LiteRT-LM, open the Android sample in Android Studio, let Gradle sync so it pulls the dependency, and run over USB.</p>
+      </div></div>
+      <div class="step"><div class="num"></div><div>
+        <h3>Read the lines that matter</h3>
+        <p>Find model load, backend selection with a support check and CPU fallback, session creation, and the streaming generate call. That is the whole API you will reuse.</p>
+      </div></div>
+      <div class="step"><div class="num"></div><div>
+        <h3>Modify one thing</h3>
+        <p>Feed it a few fake captured events as context and ask "what was I just doing?" Watch it answer grounded in the context. Your hackathon AI path is proven.</p>
+      </div></div>
+    </div>
+    <div class="snippet">
+<span class="c"># push the model where the sample expects it</span><br>
+adb shell mkdir -p /data/local/tmp/llm/<br>
+adb push gemma-4-E2B-it.litertlm /data/local/tmp/llm/<br>
+<span class="c"># match the exact filename/path in the sample README</span>
+    </div>
+    <div class="callout">
+      <p class="tag">Do not copy from memory</p>
+      <p>The LiteRT-LM API is young and class and method names shift between versions. The sample app on the tag you clone is the only trustworthy reference. Read it, not old blog posts, and take the Gradle coordinate from its build.gradle.</p>
+    </div>
+  </section>
+
+  <section>
+    <p class="kicker">Before you sleep</p>
+    <h2>The pre-event checklist</h2>
+    <p class="lead-in">Learning and assets only. <strong>No project code before 10:30.</strong></p>
+    <div class="rows">
+      <div class="row"><span class="row-name">Demo phone</span><span class="row-desc">Chosen, chipset noted, backend confirmed as GPU or NPU ideal, CPU acceptable but slow, 8 GB or more RAM, adb working.</span></div>
+      <div class="row"><span class="row-name">Model files</span><span class="row-desc">.litertlm for E2B pushed to the phone, E4B optional. Zero downloads needed at the venue.</span></div>
+      <div class="row"><span class="row-name">The sample run</span><span class="row-desc">Run once on GPU, with the load, backend, session, and generate calls read and understood.</span></div>
+      <div class="row"><span class="row-name">Node dump</span><span class="row-desc">uiautomator dump eyeballed on Chrome, WhatsApp, Gmail to confirm rich text on your build.</span></div>
+      <div class="row"><span class="row-name">Offline build</span><span class="row-desc">One full build at home so Gradle caches every dependency locally. Assume venue wifi is unusable.</span></div>
+      <div class="row"><span class="row-name">Roles set</span><span class="row-desc">Capture, AI, and UI-plus-demo assigned across the three of you.</span></div>
+    </div>
+  </section>
+
+  <footer>
+    <p class="mark">Now go build it</p>
+    <p>Test the phones tonight. If one runs Gemma fast, the plan is real. Everything else, you already know how to do.</p>
+  </footer>
+
+</div>
+</body>
+</html>

@@ -12,6 +12,7 @@ import com.wake.app.retrieval.Retriever
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 class WakeApp : Application() {
 

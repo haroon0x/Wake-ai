@@ -14,6 +14,7 @@ import com.wake.app.data.STATUS_EXPIRED
 import com.wake.app.data.STATUS_PROPOSED
 import com.wake.app.data.STATUS_THINKING
 import com.wake.app.data.STATUS_WATCHING
+import com.wake.app.data.TASK_COMMITMENT
 import com.wake.app.data.TASK_PENDING_REPLY
 import com.wake.app.data.withTrace
 import kotlinx.coroutines.CoroutineScope
@@ -54,7 +55,8 @@ class AgentEngine(
     private suspend fun onNotification(event: MemoryEvent) {
         val sender = event.sender?.trim().orEmpty()
         if (sender.isEmpty() || event.pkg.isNullOrBlank()) return
-        val existing = taskDao.activeFor(event.pkg, sender)
+        maybeCommitment(event, sender)
+        val existing = taskDao.activeFor(TASK_PENDING_REPLY, event.pkg, sender)
         val now = System.currentTimeMillis()
         if (existing != null) {
             if (existing.status == STATUS_WATCHING) {
@@ -84,11 +86,33 @@ class AgentEngine(
         )
     }
 
+    private suspend fun maybeCommitment(event: MemoryEvent, sender: String) {
+        if (!CommitmentDetector.matches(event.text)) return
+        if (taskDao.activeFor(TASK_COMMITMENT, event.pkg, sender) != null) return
+        val now = System.currentTimeMillis()
+        if (taskDao.dismissalsFor(event.pkg, sender, now - DAY_MILLIS) >= MAX_DISMISSALS_PER_SENDER) return
+        taskDao.insert(
+            AgentTask(
+                type = TASK_COMMITMENT,
+                status = STATUS_WATCHING,
+                createdAt = now,
+                updatedAt = now,
+                dueAt = now + COMMITMENT_DELAY_MILLIS,
+                pkg = event.pkg,
+                appLabel = event.appLabel,
+                sender = sender,
+                sourceEventId = event.id,
+                sourceText = event.text,
+                title = "Possible commitment with $sender"
+            ).withTrace("Spotted a time or deadline in $sender's message — checking if it needs a reminder", now)
+        )
+    }
+
     private suspend fun onScreenText(event: MemoryEvent) {
         if (event.pkg.isNullOrBlank()) return
         val now = System.currentTimeMillis()
         taskDao.active()
-            .filter { it.pkg == event.pkg }
+            .filter { it.type == TASK_PENDING_REPLY && it.pkg == event.pkg }
             .forEach { task ->
                 val sender = task.sender.orEmpty()
                 if (sender.length >= 3 && event.text.contains(sender, ignoreCase = true)) {
@@ -186,6 +210,7 @@ class AgentEngine(
 
     companion object {
         const val REPLY_WINDOW_MILLIS = 3 * 60_000L
+        const val COMMITMENT_DELAY_MILLIS = 60_000L
         const val TICK_MILLIS = 30_000L
         const val DAY_MILLIS = 86_400_000L
         const val STALE_MILLIS = 12 * 3_600_000L

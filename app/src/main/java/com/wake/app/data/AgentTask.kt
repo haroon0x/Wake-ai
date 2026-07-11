@@ -7,6 +7,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 const val TASK_PENDING_REPLY = "pending_reply"
+const val TASK_COMMITMENT = "commitment"
 
 const val STATUS_WATCHING = "watching"
 const val STATUS_THINKING = "thinking"

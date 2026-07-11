@@ -27,8 +27,8 @@ interface AgentTaskDao {
     @Query("SELECT * FROM agent_task WHERE status IN ('watching', 'thinking', 'proposed')")
     suspend fun active(): List<AgentTask>
 
-    @Query("SELECT * FROM agent_task WHERE status IN ('watching', 'thinking', 'proposed') AND pkg = :pkg AND sender = :sender LIMIT 1")
-    suspend fun activeFor(pkg: String?, sender: String?): AgentTask?
+    @Query("SELECT * FROM agent_task WHERE status IN ('watching', 'thinking', 'proposed') AND type = :type AND pkg = :pkg AND sender = :sender LIMIT 1")
+    suspend fun activeFor(type: String, pkg: String?, sender: String?): AgentTask?
 
     @Query("SELECT * FROM agent_task WHERE status = 'watching' AND dueAt <= :now")
     suspend fun overdue(now: Long): List<AgentTask>

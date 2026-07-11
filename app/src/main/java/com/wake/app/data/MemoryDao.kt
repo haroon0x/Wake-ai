@@ -29,6 +29,12 @@ interface MemoryDao {
     @Query("SELECT * FROM memory_event ORDER BY timestamp DESC LIMIT :limit")
     fun recentFlow(limit: Int): Flow<List<MemoryEvent>>
 
+    @Query("SELECT * FROM memory_event WHERE source = :source AND timestamp >= :since ORDER BY timestamp DESC LIMIT :limit")
+    fun sourceFlow(source: String, since: Long, limit: Int): Flow<List<MemoryEvent>>
+
+    @Query("SELECT * FROM memory_event WHERE conversationId = :conversationId AND timestamp >= :since ORDER BY timestamp ASC LIMIT :limit")
+    suspend fun byConversation(conversationId: String, since: Long, limit: Int): List<MemoryEvent>
+
     @Query(
         """
         SELECT me.* FROM memory_event me

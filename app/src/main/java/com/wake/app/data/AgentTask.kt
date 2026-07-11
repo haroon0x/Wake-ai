@@ -3,6 +3,7 @@ package com.wake.app.data
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import androidx.room.ColumnInfo
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -35,6 +36,7 @@ data class AgentTask(
     val pkg: String?,
     val appLabel: String?,
     val sender: String?,
+    @ColumnInfo(defaultValue = "NULL") val conversationId: String? = null,
     val sourceEventId: Long,
     val sourceText: String,
     val title: String,

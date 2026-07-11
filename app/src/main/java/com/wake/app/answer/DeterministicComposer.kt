@@ -26,7 +26,7 @@ class DeterministicComposer(private val retriever: Retriever) {
 
     private suspend fun recentActivity(): String {
         val events = retriever.recent(30)
-        if (events.isEmpty()) return "No memory captured in the last 30 minutes yet."
+        if (events.isEmpty()) return "Enable capture and use your phone for a bit, then I can summarize your recent activity."
         val apps = events.map { it.displaySource() }
             .distinct()
             .take(6)
@@ -67,7 +67,7 @@ class DeterministicComposer(private val retriever: Retriever) {
 
     private suspend fun searchAnswer(query: String): String {
         val hits = retriever.search(query)
-        if (hits.isEmpty()) return "I couldn't find that in your memory yet."
+        if (hits.isEmpty()) return "Try a broader phrase, a person's name, an app, or a time range."
         val top = hits.first()
         return buildString {
             append("Found: \"")

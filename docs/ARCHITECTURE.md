@@ -10,6 +10,8 @@ Update this document whenever a feature lands: flip its status, and amend the af
 |---|---|
 | Room storage + FTS4 search (`data/`) | Done |
 | Notification capture (`WakeNotificationListener`) | Done |
+| Stable conversation identity + incoming/outgoing message direction | Done (direction depends on notification metadata) |
+| Live conversation-style notification chat | Done |
 | Screen text capture via AccessibilityService (`ScreenTextService`) | Done |
 | Ingest pipeline: exclusions, normalized/near dedup, screen deltas, chunks, durable app-aware sessions (`capture/`) | Done |
 | Retrieval (`retrieval/Retriever`) | Done |
@@ -49,7 +51,7 @@ All captures are converted to text at ingest time; no pixels or screenshots are 
 ## Modules (`app/src/main/java/com/wake/app/`)
 
 ### `data/` — storage
-- `MemoryEvent` — the single table for every capture. Fields: timestamp, source (`notification` | `screen_text` | `manual`), pkg, appLabel, sender, text, structured, sessionId, contentHash, embedding. Indexed on timestamp, contentHash, sessionId.
+- `MemoryEvent` — the single table for every capture. Fields: timestamp, source (`notification` | `screen_text` | `manual`), pkg, appLabel, sender, conversationId, direction, text, structured, sessionId, contentHash, embedding. Indexed on timestamp, contentHash, sessionId.
 - `MemoryFts` — FTS4 external-content table over text, sender, appLabel.
 - `MemoryDao` — insert, `existsRecent` (dedup), `since`, `recentFlow`, `search` (FTS MATCH join), embedding backfill queries, `bySession`, `deleteOlderThan`, `clear`.
 - `WakeDb` — singleton Room database, destructive migration (pre-1.0).
@@ -59,7 +61,7 @@ All captures are converted to text at ingest time; no pixels or screenshots are 
 - `Ingest` — single entry point `submit(raw)`: trim → exclusion check → exact/near dedup → screen chunking → durable session assignment → insert → on-device embedding. Runs on a single-threaded IO dispatcher.
 - `SessionGrouper` — restores the latest stored session after process restart and starts a new session after a 2-minute gap or a significant app switch.
 - `Exclusions` — own package, banking/UPI/payment apps and keywords. Hard drop, never stored.
-- `WakeNotificationListener` — skips ongoing/group-summary notifications; prefers `MessagingStyle` for per-message sender, falls back to title/text extras, and records notification/conversation context.
+- `WakeNotificationListener` — skips ongoing/group-summary notifications; prefers `MessagingStyle` for per-message sender, derives stable conversation identity from shortcut/title/sender metadata, classifies direction when author metadata permits, falls back to title/text extras, and records notification/conversation context.
 - `ScreenTextService` — AccessibilityService; walks the node tree collecting unique text + contentDescription, skips unchanged screens, emits newly added lines for overlapping screens, and records window/URL/focus context. Captures are throttled 1500 ms per package and capped at 4000 chars before chunking.
 
 ### `retrieval/`
@@ -67,7 +69,7 @@ All captures are converted to text at ingest time; no pixels or screenshots are 
 
 ### `answer/`
 - `DeterministicComposer` — intent-routed answers with zero LLM ("what was I just doing", "pending replies", keyword search). The demo works even with no model on the phone.
-- `GroundedAnswerer` — retrieves top-k (8) events via hybrid search, falling back to recent memory (2 h for temporal questions, 7 days otherwise) when search misses; builds a grounded prompt (answer only from context, cite `[source, time]`, admit misses and point to the closest related memory instead of a hard "not found") and streams the engine's output. Only a truly empty database short-circuits without a model call.
+- `GroundedAnswerer` — retrieves top-k (8) events via hybrid search, falling back to recent memory (2 h for temporal questions, 7 days otherwise) when search misses; builds a grounded prompt (answer only from context, cite `[source, time]`, and lead with the closest useful evidence instead of outputting search-failure language) and streams the engine's output. Only a truly empty database short-circuits without a model call.
 
 ### `llm/` + `gemma/` — engines
 - `LlmEngine` — `name`, `isReady()`, `generate(prompt): Flow<String>`. GroundedAnswerer depends on this interface only.
@@ -80,7 +82,9 @@ All captures are converted to text at ingest time; no pixels or screenshots are 
 - `ActionExecutor` — typed capabilities: copy draft to clipboard + reopen the app (`reply`), AlarmManager reminder via `ReminderReceiver` (`remind`), launch app (`open_app`). Posts proposal notifications on the `wake_agent` channel that deep-link into the agent sheet.
 - `AgentTask` (Room, DB v3) — persistent agent state: `watching → thinking → proposed → done/dismissed/expired` plus a JSON trace timeline rendered in the UI.
 
-Agent visibility: the top bar shows an agent icon with a proposed-count badge opening `AgentSheet` — a live feed with a status pill per task (pulsing while watching/thinking), the trace timeline, draft preview, and approve/dismiss buttons.
+Agent visibility: the top bar shows an agent icon with a proposed-count badge opening `AgentSheet` — a live feed with a status pill per task (pulsing while watching/thinking), the trace timeline, draft preview, and approve/dismiss buttons. Pending-reply tasks retain conversation identity, use conversation-scoped evidence, and close when an outgoing notification message is captured.
+
+The notification icon opens a live conversation sheet grouped by stable conversation identity rather than sender alone. Incoming and outgoing captured messages render on opposite sides, and questions asked inside a thread are grounded only in that conversation's events.
 
 ### App shell
 - `WakeApp` — Application singleton; manual DI. Exposes dao, ingest, retriever, all three engines, and `answerer()` which picks the engine from prefs.

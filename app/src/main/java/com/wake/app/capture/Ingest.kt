@@ -41,6 +41,8 @@ class Ingest(
                 "source" to raw.source,
                 "package" to raw.pkg,
                 "sender" to raw.sender,
+                "conversationId" to raw.conversationId,
+                "direction" to raw.direction,
                 "text" to text,
                 "structured" to raw.structured
             )
@@ -100,6 +102,8 @@ class Ingest(
                     "source" to capture.source,
                     "package" to capture.pkg,
                     "sender" to capture.sender,
+                    "conversationId" to capture.conversationId,
+                    "direction" to capture.direction,
                     "text" to capture.text,
                     "structured" to capture.structured,
                     "embedded" to embedded,
@@ -162,6 +166,7 @@ class Ingest(
 
     private fun isNearDuplicate(raw: RawCapture, event: MemoryEvent): Boolean {
         if (raw.pkg != event.pkg || raw.source != event.source) return false
+        if (raw.conversationId != event.conversationId) return false
         val left = raw.normalizedText()
         val right = event.text.trim().replace(Regex("\\s+"), " ").lowercase()
         if (left == right) return true

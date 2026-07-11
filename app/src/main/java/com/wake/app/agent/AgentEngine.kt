@@ -4,6 +4,7 @@ import android.util.Log
 import com.wake.app.data.ACTION_DROP
 import com.wake.app.data.AgentTask
 import com.wake.app.data.AgentTaskDao
+import com.wake.app.data.DIRECTION_OUTGOING
 import com.wake.app.data.MemoryDao
 import com.wake.app.data.MemoryEvent
 import com.wake.app.data.SOURCE_NOTIFICATION
@@ -55,8 +56,12 @@ class AgentEngine(
     private suspend fun onNotification(event: MemoryEvent) {
         val sender = event.sender?.trim().orEmpty()
         if (sender.isEmpty() || event.pkg.isNullOrBlank()) return
+        if (event.direction == DIRECTION_OUTGOING) {
+            closeHandledConversation(event)
+            return
+        }
         maybeCommitment(event, sender)
-        val existing = taskDao.activeFor(TASK_PENDING_REPLY, event.pkg, sender)
+        val existing = taskDao.activeFor(TASK_PENDING_REPLY, event.pkg, sender, event.conversationId)
         val now = System.currentTimeMillis()
         if (existing != null) {
             if (existing.status == STATUS_WATCHING) {
@@ -79,6 +84,7 @@ class AgentEngine(
                 pkg = event.pkg,
                 appLabel = event.appLabel,
                 sender = sender,
+                conversationId = event.conversationId,
                 sourceEventId = event.id,
                 sourceText = event.text,
                 title = "Message from $sender"
@@ -88,7 +94,7 @@ class AgentEngine(
 
     private suspend fun maybeCommitment(event: MemoryEvent, sender: String) {
         if (!CommitmentDetector.matches(event.text)) return
-        if (taskDao.activeFor(TASK_COMMITMENT, event.pkg, sender) != null) return
+        if (taskDao.activeFor(TASK_COMMITMENT, event.pkg, sender, event.conversationId) != null) return
         val now = System.currentTimeMillis()
         if (taskDao.dismissalsFor(event.pkg, sender, now - DAY_MILLIS) >= MAX_DISMISSALS_PER_SENDER) return
         taskDao.insert(
@@ -101,11 +107,25 @@ class AgentEngine(
                 pkg = event.pkg,
                 appLabel = event.appLabel,
                 sender = sender,
+                conversationId = event.conversationId,
                 sourceEventId = event.id,
                 sourceText = event.text,
                 title = "Possible commitment with $sender"
             ).withTrace("Spotted a time or deadline in $sender's message — checking if it needs a reminder", now)
         )
+    }
+
+    private suspend fun closeHandledConversation(event: MemoryEvent) {
+        val conversationId = event.conversationId ?: return
+        val now = System.currentTimeMillis()
+        taskDao.active()
+            .filter { it.type == TASK_PENDING_REPLY && it.conversationId == conversationId }
+            .forEach { task ->
+                taskDao.update(
+                    task.copy(status = STATUS_DONE)
+                        .withTrace("Captured your reply — closing this conversation", now)
+                )
+            }
     }
 
     private suspend fun onScreenText(event: MemoryEvent) {
@@ -171,6 +191,15 @@ class AgentEngine(
     }
 
     private suspend fun relatedEvents(task: AgentTask): List<MemoryEvent> {
+        val conversationId = task.conversationId
+        if (!conversationId.isNullOrBlank()) {
+            val conversation = memoryDao.byConversation(
+                conversationId,
+                task.createdAt - CONTEXT_WINDOW_MILLIS,
+                CONTEXT_EVENTS
+            )
+            if (conversation.isNotEmpty()) return conversation
+        }
         val sender = task.sender
         val bySender = if (sender.isNullOrBlank()) emptyList() else {
             memoryDao.recentConstrained(

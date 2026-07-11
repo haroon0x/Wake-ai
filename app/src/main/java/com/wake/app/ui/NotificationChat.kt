@@ -35,10 +35,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -47,6 +48,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import com.wake.app.WakeApp
+import com.wake.app.answer.withoutMemoryFailureLanguage
+import com.wake.app.data.DIRECTION_OUTGOING
 import com.wake.app.data.MemoryEvent
 import com.wake.app.data.SOURCE_NOTIFICATION
 import com.wake.app.data.displaySource
@@ -56,6 +59,7 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import org.json.JSONObject
 
 private data class ThreadMessage(
     val id: Long,
@@ -65,40 +69,44 @@ private data class ThreadMessage(
     val streaming: Boolean = false
 )
 
+private data class NotificationConversation(
+    val id: String,
+    val title: String,
+    val events: List<MemoryEvent>
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NotificationChatSheet(onDismiss: () -> Unit) {
-    var notifications by remember { mutableStateOf<List<MemoryEvent>>(emptyList()) }
-    var selectedSender by remember { mutableStateOf<String?>(null) }
+    val since = remember { System.currentTimeMillis() - 7 * 86_400_000L }
+    val notifications by WakeApp.instance.dao.sourceFlow(SOURCE_NOTIFICATION, since, 300)
+        .collectAsState(initial = emptyList())
+    var selectedConversationId by remember { mutableStateOf<String?>(null) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    LaunchedEffect(Unit) {
-        notifications = WakeApp.instance.dao.since(
-            System.currentTimeMillis() - 7 * 86_400_000L,
-            300
-        ).filter { it.source == SOURCE_NOTIFICATION && !it.sender.isNullOrBlank() }
-    }
-
     val conversations = remember(notifications) {
-        notifications.groupBy { it.sender!! }
-            .toList()
-            .sortedByDescending { (_, events) -> events.maxOf { it.timestamp } }
+        notifications.groupBy { event ->
+            event.conversationId ?: "${event.pkg}|sender:${event.sender.orEmpty().trim().lowercase()}"
+        }.map { (id, events) ->
+            NotificationConversation(id, conversationTitle(events), events)
+        }.sortedByDescending { conversation -> conversation.events.maxOf { it.timestamp } }
     }
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         Column(modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, bottom = 20.dp)) {
-            val sender = selectedSender
-            if (sender == null) {
+            val selectedId = selectedConversationId
+            if (selectedId == null) {
                 ConversationList(
                     conversations = conversations,
-                    onOpen = { selectedSender = it },
+                    onOpen = { selectedConversationId = it },
                     onDismiss = onDismiss
                 )
             } else {
+                val conversation = conversations.firstOrNull { it.id == selectedId }
                 ConversationThread(
-                    sender = sender,
-                    events = conversations.firstOrNull { it.first == sender }?.second.orEmpty(),
-                    onBack = { selectedSender = null }
+                    title = conversation?.title ?: "Conversation",
+                    events = conversation?.events.orEmpty(),
+                    onBack = { selectedConversationId = null }
                 )
             }
         }
@@ -107,7 +115,7 @@ fun NotificationChatSheet(onDismiss: () -> Unit) {
 
 @Composable
 private fun ConversationList(
-    conversations: List<Pair<String, List<MemoryEvent>>>,
+    conversations: List<NotificationConversation>,
     onOpen: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -142,10 +150,12 @@ private fun ConversationList(
             modifier = Modifier.fillMaxWidth().height(500.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            items(conversations, key = { it.first }) { (sender, events) ->
+            items(conversations, key = { it.id }) { conversation ->
+                val sender = conversation.title
+                val events = conversation.events
                 val latest = events.maxBy { it.timestamp }
                 Surface(
-                    onClick = { onOpen(sender) },
+                    onClick = { onOpen(conversation.id) },
                     shape = RoundedCornerShape(16.dp),
                     color = MaterialTheme.colorScheme.surfaceVariant
                 ) {
@@ -184,23 +194,41 @@ private fun ConversationList(
 
 @Composable
 private fun ConversationThread(
-    sender: String,
+    title: String,
     events: List<MemoryEvent>,
     onBack: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
     val listState = rememberLazyListState()
     val timeFormat = remember { SimpleDateFormat("h:mm a", Locale.getDefault()) }
-    var query by remember(sender) { mutableStateOf("") }
-    var busy by remember(sender) { mutableStateOf(false) }
-    var thread by remember(sender) {
+    var query by remember(title) { mutableStateOf("") }
+    var busy by remember(title) { mutableStateOf(false) }
+    var thread by remember(title) {
         mutableStateOf(
             events.sortedBy { it.timestamp }.map {
-                ThreadMessage(id = it.id, role = "them", text = it.text, time = it.timestamp)
+                ThreadMessage(
+                    id = it.id,
+                    role = if (it.direction == DIRECTION_OUTGOING) "user" else "them",
+                    text = it.text,
+                    time = it.timestamp
+                )
             }
         )
     }
-    var nextId by remember(sender) { mutableStateOf(-1L) }
+    var nextId by remember(title) { mutableStateOf(-1L) }
+
+    LaunchedEffect(events) {
+        val existingIds = thread.asSequence().map { it.id }.toSet()
+        val additions = events.filterNot { it.id in existingIds }.map {
+            ThreadMessage(
+                id = it.id,
+                role = if (it.direction == DIRECTION_OUTGOING) "user" else "them",
+                text = it.text,
+                time = it.timestamp
+            )
+        }
+        if (additions.isNotEmpty()) thread = thread + additions
+    }
 
     LaunchedEffect(thread.size, thread.lastOrNull()?.text?.length) {
         if (thread.isNotEmpty()) listState.scrollToItem(thread.lastIndex)
@@ -221,7 +249,15 @@ private fun ConversationThread(
             try {
                 WakeApp.instance.answerer().answer(question, events).collect { chunk ->
                     thread = thread.map {
-                        if (it.id == answerId) it.copy(text = (it.text + chunk).withoutPackageIdentifiers()) else it
+                        if (it.id == answerId) {
+                            it.copy(
+                                text = (it.text + chunk)
+                                    .withoutPackageIdentifiers()
+                                    .withoutMemoryFailureLanguage()
+                            )
+                        } else {
+                            it
+                        }
                     }
                 }
             } catch (e: LlmException) {
@@ -243,9 +279,9 @@ private fun ConversationThread(
         IconButton(onClick = onBack) {
             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back to conversations")
         }
-        Avatar(sender)
+        Avatar(title)
         Column(modifier = Modifier.padding(start = 10.dp).weight(1f)) {
-            Text(sender, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             Text(
                 "${events.size} captured message${if (events.size == 1) "" else "s"} · ask Wake about them",
                 style = MaterialTheme.typography.labelSmall,
@@ -337,6 +373,17 @@ private fun ConversationThread(
             Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Ask")
         }
     }
+}
+
+private fun conversationTitle(events: List<MemoryEvent>): String {
+    val latest = events.maxByOrNull { it.timestamp }
+    val structuredTitle = events.asSequence().mapNotNull { event ->
+        runCatching {
+            JSONObject(event.structured.orEmpty()).optString("conversationTitle", "")
+                .takeIf { it.isNotBlank() && it != "null" }
+        }.getOrNull()
+    }.firstOrNull()
+    return structuredTitle ?: latest?.sender ?: latest?.appLabel ?: "Conversation"
 }
 
 @Composable

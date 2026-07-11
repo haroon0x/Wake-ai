@@ -1,7 +1,6 @@
 package com.wake.app.answer
 
 import com.wake.app.data.MemoryEvent
-import com.wake.app.gemma.GemmaEngine
 import com.wake.app.retrieval.Retriever
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -11,7 +10,7 @@ import kotlinx.coroutines.flow.flowOf
 
 class GroundedAnswerer(
     private val retriever: Retriever,
-    private val gemma: GemmaEngine,
+    private val llm: com.wake.app.llm.LlmEngine,
     private val topK: Int = 8
 ) {
 
@@ -20,7 +19,7 @@ class GroundedAnswerer(
     suspend fun answer(query: String): Flow<String> {
         val events = retriever.search(query, topK)
         if (events.isEmpty()) return flowOf("Not found in memory.")
-        return gemma.generate(prompt(query, events))
+        return llm.generate(prompt(query, events))
     }
 
     private fun prompt(query: String, events: List<MemoryEvent>): String = buildString {

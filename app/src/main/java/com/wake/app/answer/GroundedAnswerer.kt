@@ -17,9 +17,21 @@ class GroundedAnswerer(
     private val timeFmt = SimpleDateFormat("h:mm a", Locale.getDefault())
 
     suspend fun answer(query: String): Flow<String> {
-        val events = retriever.hybrid(query, topK).ifEmpty { retriever.recent(120, topK) }
+        if (query.isBlank()) return flowOf("Ask a question about your memory.")
+        val retrieved = retriever.hybrid(query, topK)
+        val events = if (retrieved.isNotEmpty()) retrieved else if (isTemporal(query)) {
+            retriever.recent(120, topK)
+        } else {
+            emptyList()
+        }
         if (events.isEmpty()) return flowOf("Not found in memory. Enable Notifications and Screen memory access, then use your phone for a bit.")
+        if (!llm.isReady()) return flowOf("${llm.name} is not ready. Check the model or API key.")
         return llm.generate(prompt(query, events))
+    }
+
+    private fun isTemporal(query: String): Boolean {
+        val value = query.lowercase(Locale.getDefault())
+        return temporalPhrases.any(value::contains)
     }
 
     private fun prompt(query: String, events: List<MemoryEvent>): String = buildString {
@@ -44,5 +56,12 @@ class GroundedAnswerer(
         append("\nQuestion: ")
         append(query)
         append("\nAnswer:")
+    }
+
+    private companion object {
+        val temporalPhrases = listOf(
+            "just doing", "recently", "today", "this morning", "this afternoon", "tonight",
+            "last hour", "last two hours", "what was i", "what did i"
+        )
     }
 }

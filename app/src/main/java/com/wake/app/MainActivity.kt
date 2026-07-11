@@ -5,69 +5,98 @@ import android.os.Bundle
 import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.animation.AnimatedVisibility
+import androidx.activity.enableEdgeToEdge
+import androidx.core.app.NotificationManagerCompat
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.keyframes
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.wake.app.answer.DeterministicComposer
-import com.wake.app.gemma.GemmaEngine
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import com.wake.app.data.MemoryEvent
+import com.wake.app.ui.ChatMessage
+import com.wake.app.ui.ChatViewModel
 import com.wake.app.ui.WakeTheme
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val composer = DeterministicComposer(WakeApp.instance.retriever)
+        enableEdgeToEdge()
         setContent {
             WakeTheme {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
-                ) {
-                    AskScreen(composer, ::openNotificationAccess, ::openAccessibility)
-                }
+                ChatScreen(::openNotificationAccess, ::openAccessibility)
             }
         }
     }
@@ -81,204 +110,446 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AskScreen(
-    composer: DeterministicComposer,
-    onNotif: () -> Unit,
-    onA11y: () -> Unit
+private fun ChatScreen(
+    onNotifications: () -> Unit,
+    onAccessibility: () -> Unit,
+    chatViewModel: ChatViewModel = viewModel()
 ) {
-    val context = LocalContext.current
+    val messages by chatViewModel.messages.collectAsState()
+    val busy by chatViewModel.busy.collectAsState()
+    val listState = rememberLazyListState()
     var query by remember { mutableStateOf("") }
-    var answer by remember { mutableStateOf("") }
-    var recent by remember { mutableStateOf(listOf<String>()) }
-    var engine by remember { mutableStateOf(Prefs.engineChoice(context)) }
-    var apiKey by remember { mutableStateOf(Prefs.savedGeminiApiKey(context)) }
-    var busy by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
-    val ask: () -> Unit = {
-        if (!busy) {
-            busy = true
-            answer = ""
-            scope.launch {
-                try {
-                    WakeApp.instance.answerer().answer(query).collect { answer += it }
-                } finally {
-                    busy = false
+    var showSettings by remember { mutableStateOf(false) }
+
+    LaunchedEffect(messages.size) {
+        if (messages.isNotEmpty()) listState.animateScrollToItem(messages.lastIndex)
+    }
+
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background
+    ) {
+        Column(modifier = Modifier.fillMaxSize().navigationBarsPadding()) {
+            TopBar(onSettings = { showSettings = true })
+            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                if (messages.isEmpty()) {
+                    EmptyState(onSuggestion = chatViewModel::send)
+                } else {
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                            start = 18.dp,
+                            end = 18.dp,
+                            top = 14.dp,
+                            bottom = 14.dp
+                        )
+                    ) {
+                        itemsIndexed(messages, key = { _, message -> message.id }) { index, message ->
+                            val previousRole = messages.getOrNull(index - 1)?.role
+                            MessageBubble(
+                                message = message,
+                                modifier = Modifier
+                                    .animateItem()
+                                    .padding(top = if (index == 0) 0.dp else if (previousRole == message.role) 6.dp else 14.dp)
+                            )
+                        }
+                    }
+                }
+            }
+            InputBar(
+                query = query,
+                onQueryChange = { query = it },
+                enabled = !busy && query.isNotBlank(),
+                onSend = {
+                    if (!busy && query.isNotBlank()) {
+                        chatViewModel.send(query)
+                        query = ""
+                    }
+                }
+            )
+        }
+    }
+
+    if (showSettings) {
+        SettingsSheet(
+            onDismiss = { showSettings = false },
+            onNotifications = onNotifications,
+            onAccessibility = onAccessibility
+        )
+    }
+}
+
+@Composable
+private fun TopBar(onSettings: () -> Unit) {
+    Surface(color = MaterialTheme.colorScheme.surface) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 12.dp, top = 12.dp, bottom = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Wake",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = (-0.4).sp
+            )
+            Box(
+                modifier = Modifier.padding(start = 7.dp, top = 2.dp).size(7.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primary, modifier = Modifier.fillMaxSize()) {}
+            }
+            Spacer(modifier = Modifier.weight(1f))
+            IconButton(onClick = onSettings) {
+                Icon(Icons.Outlined.Settings, contentDescription = "Engine settings")
+            }
+        }
+    }
+}
+
+@Composable
+private fun EmptyState(onSuggestion: (String) -> Unit) {
+    val suggestions = listOf(
+        "What was I just doing?",
+        "Any messages I haven't replied to?",
+        "What did I read about today?"
+    )
+    Column(
+        modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Surface(shape = RoundedCornerShape(22.dp), color = MaterialTheme.colorScheme.primaryContainer) {
+            Text(
+                text = "W",
+                modifier = Modifier.padding(horizontal = 19.dp, vertical = 12.dp),
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onPrimaryContainer
+            )
+        }
+        Text(
+            text = "Ask anything about what you've seen.",
+            modifier = Modifier.padding(top = 20.dp, bottom = 18.dp),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold
+        )
+        suggestions.forEach { suggestion ->
+            FilterChip(
+                selected = false,
+                onClick = { onSuggestion(suggestion) },
+                label = { Text(suggestion) },
+                modifier = Modifier.padding(vertical = 2.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun MessageBubble(message: ChatMessage, modifier: Modifier = Modifier) {
+    val user = message.role == "user"
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = if (user) Arrangement.End else Arrangement.Start
+    ) {
+        Surface(
+            modifier = Modifier
+                .widthIn(max = 300.dp)
+                .animateContentSize(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)),
+            shape = if (user) {
+                RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp, bottomEnd = 4.dp, bottomStart = 18.dp)
+            } else {
+                RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp, bottomEnd = 18.dp, bottomStart = 4.dp)
+            },
+            color = if (user) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
+        ) {
+            if (message.streaming && message.text.isEmpty()) {
+                TypingIndicator(modifier = Modifier.padding(horizontal = 16.dp, vertical = 15.dp))
+            } else {
+                SelectionContainer {
+                    Text(
+                        text = message.text,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 11.dp),
+                        style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 22.sp),
+                        color = if (user) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
         }
     }
-    val status = if (engine == "gemma") {
-        if (WakeApp.instance.gemmaEngine.isReady()) "Gemma model: ready"
-        else "Gemma model: file missing (${GemmaEngine.MODEL_FILE})"
-    } else "API key: ready"
-    val ready = (engine == "gemma" && WakeApp.instance.gemmaEngine.isReady()) ||
-        engine == "gemini" || engine == "gemma_cloud"
-    val askInteractionSource = remember { MutableInteractionSource() }
-    val pressed by askInteractionSource.collectIsPressedAsState()
-    val askScale by animateFloatAsState(
-        targetValue = if (pressed) 0.97f else 1f,
-        animationSpec = spring(stiffness = Spring.StiffnessHigh),
-        label = "askScale"
-    )
+}
 
-    Column(
-        modifier = Modifier.fillMaxSize().padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Column {
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(
-                    text = "Wake",
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = (-0.5).sp
-                )
-                Text("●", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.headlineSmall)
+@Composable
+private fun TypingIndicator(modifier: Modifier = Modifier) {
+    val transition = rememberInfiniteTransition(label = "typing")
+    Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+        repeat(3) { index ->
+            val alpha by transition.animateFloat(
+                initialValue = 0.28f,
+                targetValue = 1f,
+                animationSpec = infiniteRepeatable(
+                    animation = keyframes {
+                        durationMillis = 1050
+                        0.28f at index * 175
+                        1f at index * 175 + 350 using FastOutSlowInEasing
+                        0.28f at index * 175 + 700
+                    },
+                    repeatMode = RepeatMode.Restart
+                ),
+                label = "typingDot$index"
+            )
+            Box(
+                modifier = Modifier.size(7.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = alpha)
+                ) {}
+            }
+        }
+    }
+}
+
+@Composable
+private fun InputBar(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    enabled: Boolean,
+    onSend: () -> Unit
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.92f else 1f,
+        animationSpec = spring(stiffness = Spring.StiffnessHigh),
+        label = "sendScale"
+    )
+    Surface(color = MaterialTheme.colorScheme.surface, tonalElevation = 3.dp) {
+        Row(
+            modifier = Modifier.fillMaxWidth().imePadding().padding(horizontal = 16.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            OutlinedTextField(
+                value = query,
+                onValueChange = onQueryChange,
+                modifier = Modifier.weight(1f),
+                placeholder = { Text("Ask your phone") },
+                singleLine = true,
+                shape = RoundedCornerShape(24.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = Color.Transparent,
+                    unfocusedBorderColor = Color.Transparent,
+                    focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant
+                ),
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                keyboardActions = KeyboardActions(onSend = { if (enabled) onSend() })
+            )
+            FilledIconButton(
+                onClick = onSend,
+                enabled = enabled,
+                interactionSource = interactionSource,
+                modifier = Modifier.size(48.dp).scale(scale)
+            ) {
+                Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send")
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SettingsSheet(
+    onDismiss: () -> Unit,
+    onNotifications: () -> Unit,
+    onAccessibility: () -> Unit
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var engine by remember { mutableStateOf(Prefs.engineChoice(context)) }
+    var apiKey by remember { mutableStateOf(Prefs.savedGeminiApiKey(context)) }
+    var recent by remember { mutableStateOf<List<MemoryEvent>>(emptyList()) }
+    var retentionDays by remember { mutableStateOf(Prefs.retentionDays(context)) }
+    var showClearConfirmation by remember { mutableStateOf(false) }
+    var notificationsEnabled by remember { mutableStateOf(false) }
+    var accessibilityEnabled by remember { mutableStateOf(false) }
+    val activity = context as ComponentActivity
+    val refreshPermissions = {
+        notificationsEnabled = NotificationManagerCompat.getEnabledListenerPackages(context)
+            .contains(context.packageName)
+        accessibilityEnabled = isAccessibilityEnabled(context)
+    }
+
+    DisposableEffect(activity) {
+        refreshPermissions()
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) refreshPermissions()
+        }
+        activity.lifecycle.addObserver(observer)
+        onDispose { activity.lifecycle.removeObserver(observer) }
+    }
+
+    LaunchedEffect(Unit) {
+        recent = WakeApp.instance.dao.since(System.currentTimeMillis() - 24 * 60 * 60_000L, Int.MAX_VALUE)
+    }
+
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(start = 20.dp, end = 20.dp, bottom = 28.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Text("Settings", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            Text("Engine", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                EngineChoice("Gemma on-device", "gemma", engine) {
+                    engine = it
+                    Prefs.setEngineChoice(context, it)
+                }
+                EngineChoice("Gemma cloud", "gemma_cloud", engine) {
+                    engine = it
+                    Prefs.setEngineChoice(context, it)
+                }
+                EngineChoice("Gemini cloud", "gemini", engine) {
+                    engine = it
+                    Prefs.setEngineChoice(context, it)
+                }
             }
             Text(
-                text = "Your phone remembers.",
+                text = engineStatus(engine, apiKey),
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
+                color = if (engine == "gemma" && !WakeApp.instance.gemmaEngine.isReady()) {
+                    MaterialTheme.colorScheme.error
+                } else {
+                    MaterialTheme.colorScheme.secondary
+                }
             )
-        }
-
-        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            TextButton(onClick = onNotif) { Text("Notifications") }
-            TextButton(onClick = onA11y) { Text("Screen memory") }
-        }
-
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilterChip(
-                selected = engine == "gemma",
-                onClick = {
-                    engine = "gemma"
-                    Prefs.setEngineChoice(context, engine)
-                },
-                label = { Text("Gemma on-device") }
-            )
-            FilterChip(
-                selected = engine == "gemma_cloud",
-                onClick = {
-                    engine = "gemma_cloud"
-                    Prefs.setEngineChoice(context, engine)
-                },
-                label = { Text("Gemma cloud") }
-            )
-            FilterChip(
-                selected = engine == "gemini",
-                onClick = {
-                    engine = "gemini"
-                    Prefs.setEngineChoice(context, engine)
-                },
-                label = { Text("Gemini cloud") }
-            )
-        }
-
-        Text(
-            text = status,
-            style = MaterialTheme.typography.bodySmall,
-            color = if (ready) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.error
-        )
-
-        AnimatedVisibility(
-            visible = engine == "gemini" || engine == "gemma_cloud",
-            enter = fadeIn() + expandVertically(),
-            exit = fadeOut() + shrinkVertically()
-        ) {
             OutlinedTextField(
                 value = apiKey,
                 onValueChange = {
                     apiKey = it
                     Prefs.setGeminiApiKey(context, it)
                 },
-                label = { Text("Gemini API key") },
-                placeholder = { Text("Using built-in key") },
-                visualTransformation = PasswordVisualTransformation(),
                 modifier = Modifier.fillMaxWidth(),
+                label = { Text("API key") },
+                placeholder = { Text("Required for cloud engines") },
+                visualTransformation = PasswordVisualTransformation(),
                 singleLine = true
             )
-        }
-
-        OutlinedTextField(
-            value = query,
-            onValueChange = { query = it },
-            label = { Text("Ask your phone") },
-            trailingIcon = {
-                TextButton(onClick = ask, enabled = !busy) { Text("Ask") }
-            },
-            shape = RoundedCornerShape(16.dp),
-            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = ImeAction.Send),
-            keyboardActions = androidx.compose.foundation.text.KeyboardActions(onSend = { ask() }),
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true
-        )
-
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(
-                onClick = ask,
-                enabled = !busy,
-                interactionSource = askInteractionSource,
-                modifier = Modifier.graphicsLayer {
-                    scaleX = askScale
-                    scaleY = askScale
-                }
-            ) { Text(if (busy) "Asking…" else "Ask") }
-            TextButton(onClick = {
-                scope.launch {
-                    val events = WakeApp.instance.retriever.recent(30)
-                    recent = events.map { "${it.appLabel ?: it.pkg}: ${it.text.take(70)}" }
-                }
-            }) { Text("Recent") }
-            TextButton(onClick = {
-                scope.launch { answer = composer.answer(query.ifBlank { "what was i just doing" }) }
-            }) { Text("Quick") }
-        }
-
-        AnimatedVisibility(
-            visible = answer.isNotBlank() || busy,
-            enter = fadeIn() + expandVertically(),
-            exit = fadeOut() + shrinkVertically()
-        ) {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .animateContentSize(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-            ) {
-                if (busy && answer.isBlank()) {
-                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth().padding(12.dp))
-                } else {
-                    Text(answer, modifier = Modifier.padding(12.dp), style = MaterialTheme.typography.bodyMedium)
+            Text("Capture", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            CaptureRow(
+                if (notificationsEnabled) "Notifications enabled" else "Notifications disabled",
+                Icons.Outlined.Notifications,
+                onNotifications
+            )
+            CaptureRow(
+                if (accessibilityEnabled) "Screen memory enabled" else "Screen memory disabled",
+                Icons.Outlined.Settings,
+                onAccessibility
+            )
+            Text("Memory", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text("${recent.size} events captured in the last 24 hours", style = MaterialTheme.typography.bodyMedium)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(7 to "7 days", 30 to "30 days", 0 to "Forever").forEach { (days, label) ->
+                    FilterChip(
+                        selected = retentionDays == days,
+                        onClick = {
+                            retentionDays = days
+                            Prefs.setRetentionDays(context, days)
+                            scope.launch {
+                                WakeApp.instance.applyRetention()
+                            }
+                        },
+                        label = { Text(label) }
+                    )
                 }
             }
-        }
-
-        Spacer(modifier = Modifier.weight(1f))
-
-        if (recent.isNotEmpty()) {
-            Text("Recent", style = MaterialTheme.typography.titleSmall)
-            LazyColumn(
-                modifier = Modifier.fillMaxWidth().heightIn(max = 180.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                items(recent) { line ->
+            TextButton(onClick = { showClearConfirmation = true }) { Text("Clear all memory") }
+            if (recent.isNotEmpty()) {
+                Text("Recent captures", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                recent.take(5).forEach { event ->
                     Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
-                        val separator = line.indexOf(": ")
-                        Column(modifier = Modifier.padding(12.dp)) {
+                        Column(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
                             Text(
-                                text = if (separator >= 0) line.substring(0, separator) else line,
+                                text = event.appLabel ?: event.pkg ?: event.source,
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.primary
                             )
-                            if (separator >= 0) {
-                                Text(line.substring(separator + 2), style = MaterialTheme.typography.bodySmall)
-                            }
+                            Text(event.text.take(100), style = MaterialTheme.typography.bodySmall, maxLines = 2)
                         }
                     }
                 }
             }
+            Spacer(modifier = Modifier.height(4.dp))
         }
     }
+
+    if (showClearConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showClearConfirmation = false },
+            title = { Text("Clear all memory?") },
+            text = { Text("This permanently removes every captured notification, screen memory, and embedding from Wake.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showClearConfirmation = false
+                    scope.launch {
+                        WakeApp.instance.dao.clear()
+                        recent = emptyList()
+                    }
+                }) { Text("Clear") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearConfirmation = false }) { Text("Cancel") }
+            }
+        )
+    }
+}
+
+@Composable
+private fun EngineChoice(label: String, value: String, selected: String, onSelect: (String) -> Unit) {
+    FilterChip(
+        selected = selected == value,
+        onClick = { onSelect(value) },
+        label = { Text(label) },
+        modifier = Modifier.fillMaxWidth()
+    )
+}
+
+@Composable
+private fun CaptureRow(
+    label: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    onClick: () -> Unit
+) {
+    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+        Text(label, modifier = Modifier.padding(start = 12.dp).weight(1f), style = MaterialTheme.typography.bodyLarge)
+        Button(onClick = onClick) { Text("Open") }
+    }
+}
+
+private fun engineStatus(engine: String, savedKey: String): String = when (engine) {
+    "gemma" -> WakeApp.instance.gemmaEngine.stateMessage()
+    else -> if (savedKey.isNotBlank() || Prefs.geminiApiKey(WakeApp.instance).isNotBlank()) {
+        "Cloud API key ready"
+    } else {
+        "Cloud API key required"
+    }
+}
+
+private fun isAccessibilityEnabled(context: android.content.Context): Boolean {
+    val enabledServices = Settings.Secure.getString(
+        context.contentResolver,
+        Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+    ).orEmpty()
+    val service = "${context.packageName}/${com.wake.app.capture.ScreenTextService::class.java.name}"
+    return enabledServices.split(':').any { it.equals(service, ignoreCase = true) }
 }

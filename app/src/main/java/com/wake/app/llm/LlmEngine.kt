@@ -9,3 +9,5 @@ interface LlmEngine {
 
     fun generate(prompt: String): Flow<String>
 }
+
+class LlmException(message: String, cause: Throwable? = null) : Exception(message, cause)

@@ -18,10 +18,10 @@ Update this document whenever a feature lands: flip its status, and amend the af
 | Grounded RAG answerer (`answer/GroundedAnswerer`) | Done |
 | `LlmEngine` abstraction (Gemma on-device / Gemma 4 cloud / Gemini Flash cloud selectable) | Done |
 | Gemini Flash and Gemma 4 cloud API engine (`llm/GeminiEngine`) | Done |
-| LiteRT-LM real inference in `GemmaEngine` (echo stub; wiring in `design/litert-lm-wiring.md`) | In progress |
-| UI: engine toggle, API key entry, streaming answers, app icon, dark theme | Done |
+| LiteRT-LM real inference in `GemmaEngine` (`litertlm-android:0.13.0`, GPU→CPU fallback) | Done (needs on-device verify) |
+| Chat UI: streaming bubbles, typing indicator, suggestion chips, settings sheet | Done |
+| Retention policy + clear-all (settings sheet, `applyRetention`) | Done |
 | Agent actions (detect abandoned task → propose → act) | Not started |
-| Retention / cleanup policy (`deleteOlderThan` exists, unscheduled) | Not started |
 
 ## Data flow
 

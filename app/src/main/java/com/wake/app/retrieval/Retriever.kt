@@ -39,11 +39,21 @@ class Retriever(
     }
 
     suspend fun hybrid(query: String, limit: Int = 8): List<MemoryEvent> {
-        val lexical = search(query, limit)
-        if (lexical.size >= limit) return lexical
-        return (lexical + semantic(query, limit))
+        val lexical = search(query, limit * 2)
+        val semantic = semantic(query, limit * 2)
+        if (semantic.isEmpty()) return lexical.take(limit)
+        return (lexical + semantic)
             .distinctBy { it.id }
+            .map { event ->
+                val lexicalRank = lexical.indexOfFirst { it.id == event.id }
+                val semanticRank = semantic.indexOfFirst { it.id == event.id }
+                val score = (if (lexicalRank >= 0) 1f / (60 + lexicalRank) else 0f) +
+                    (if (semanticRank >= 0) 1f / (60 + semanticRank) else 0f)
+                event to score
+            }
+            .sortedByDescending { it.second }
             .take(limit)
+            .map { it.first }
     }
 
     private fun terms(query: String): List<String> =

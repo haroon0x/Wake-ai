@@ -22,5 +22,6 @@ data class MemoryEvent(
     val text: String,
     val structured: String?,
     val sessionId: Long,
-    val contentHash: String
+    val contentHash: String,
+    val embedding: ByteArray? = null
 )

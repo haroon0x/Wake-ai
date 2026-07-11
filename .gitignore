@@ -11,3 +11,7 @@
 local.properties
 *.apk
 *.litertlm
+hackathon_details.md
+*:Zone.Identifier
+.kotlin/
+*.log

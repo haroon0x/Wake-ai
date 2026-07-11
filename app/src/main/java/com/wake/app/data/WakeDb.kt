@@ -7,7 +7,7 @@ import androidx.room.RoomDatabase
 
 @Database(
     entities = [MemoryEvent::class, MemoryFts::class],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class WakeDb : RoomDatabase() {

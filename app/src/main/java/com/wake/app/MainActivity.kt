@@ -5,6 +5,17 @@ import android.os.Bundle
 import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -33,11 +44,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.wake.app.answer.DeterministicComposer
 import com.wake.app.gemma.GemmaEngine
 import com.wake.app.ui.WakeTheme
@@ -79,7 +92,7 @@ private fun AskScreen(
     var answer by remember { mutableStateOf("") }
     var recent by remember { mutableStateOf(listOf<String>()) }
     var engine by remember { mutableStateOf(Prefs.engineChoice(context)) }
-    var apiKey by remember { mutableStateOf(Prefs.geminiApiKey(context).orEmpty()) }
+    var apiKey by remember { mutableStateOf(Prefs.savedGeminiApiKey(context)) }
     var busy by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val ask: () -> Unit = {
@@ -98,11 +111,16 @@ private fun AskScreen(
     val status = if (engine == "gemma") {
         if (WakeApp.instance.gemmaEngine.isReady()) "Gemma model: ready"
         else "Gemma model: file missing (${GemmaEngine.MODEL_FILE})"
-    } else {
-        if (Prefs.geminiApiKey(context).isNullOrBlank()) "Gemini key: missing" else "Gemini key: set"
-    }
+    } else "API key: ready"
     val ready = (engine == "gemma" && WakeApp.instance.gemmaEngine.isReady()) ||
-        (engine == "gemini" && !Prefs.geminiApiKey(context).isNullOrBlank())
+        engine == "gemini" || engine == "gemma_cloud"
+    val askInteractionSource = remember { MutableInteractionSource() }
+    val pressed by askInteractionSource.collectIsPressedAsState()
+    val askScale by animateFloatAsState(
+        targetValue = if (pressed) 0.97f else 1f,
+        animationSpec = spring(stiffness = Spring.StiffnessHigh),
+        label = "askScale"
+    )
 
     Column(
         modifier = Modifier.fillMaxSize().padding(20.dp),
@@ -113,7 +131,8 @@ private fun AskScreen(
                 Text(
                     text = "Wake",
                     style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = (-0.5).sp
                 )
                 Text("●", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.headlineSmall)
             }
@@ -136,7 +155,15 @@ private fun AskScreen(
                     engine = "gemma"
                     Prefs.setEngineChoice(context, engine)
                 },
-                label = { Text("Gemma (on-device)") }
+                label = { Text("Gemma on-device") }
+            )
+            FilterChip(
+                selected = engine == "gemma_cloud",
+                onClick = {
+                    engine = "gemma_cloud"
+                    Prefs.setEngineChoice(context, engine)
+                },
+                label = { Text("Gemma cloud") }
             )
             FilterChip(
                 selected = engine == "gemini",
@@ -144,7 +171,7 @@ private fun AskScreen(
                     engine = "gemini"
                     Prefs.setEngineChoice(context, engine)
                 },
-                label = { Text("Gemini (cloud)") }
+                label = { Text("Gemini cloud") }
             )
         }
 
@@ -154,7 +181,11 @@ private fun AskScreen(
             color = if (ready) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.error
         )
 
-        if (engine == "gemini") {
+        AnimatedVisibility(
+            visible = engine == "gemini" || engine == "gemma_cloud",
+            enter = fadeIn() + expandVertically(),
+            exit = fadeOut() + shrinkVertically()
+        ) {
             OutlinedTextField(
                 value = apiKey,
                 onValueChange = {
@@ -162,6 +193,7 @@ private fun AskScreen(
                     Prefs.setGeminiApiKey(context, it)
                 },
                 label = { Text("Gemini API key") },
+                placeholder = { Text("Using built-in key") },
                 visualTransformation = PasswordVisualTransformation(),
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true
@@ -183,7 +215,15 @@ private fun AskScreen(
         )
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = ask, enabled = !busy) { Text(if (busy) "Asking…" else "Ask") }
+            Button(
+                onClick = ask,
+                enabled = !busy,
+                interactionSource = askInteractionSource,
+                modifier = Modifier.graphicsLayer {
+                    scaleX = askScale
+                    scaleY = askScale
+                }
+            ) { Text(if (busy) "Asking…" else "Ask") }
             TextButton(onClick = {
                 scope.launch {
                     val events = WakeApp.instance.retriever.recent(30)
@@ -195,9 +235,15 @@ private fun AskScreen(
             }) { Text("Quick") }
         }
 
-        if (answer.isNotBlank() || busy) {
+        AnimatedVisibility(
+            visible = answer.isNotBlank() || busy,
+            enter = fadeIn() + expandVertically(),
+            exit = fadeOut() + shrinkVertically()
+        ) {
             Card(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .animateContentSize(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)),
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
             ) {

@@ -11,10 +11,9 @@ import java.net.URL
 
 class GeminiEngine(
     private val apiKeyProvider: () -> String?,
-    private val model: String = MODEL
+    private val model: String = MODEL,
+    override val name: String = "Gemini"
 ) : LlmEngine {
-    override val name = "Gemini"
-
     override fun isReady(): Boolean = !apiKeyProvider().isNullOrBlank()
 
     override fun generate(prompt: String): Flow<String> = flow {
@@ -78,5 +77,6 @@ class GeminiEngine(
 
     companion object {
         const val MODEL = "gemini-flash-latest"
+        const val GEMMA_CLOUD_MODEL = "gemma-4-e2b-it"
     }
 }

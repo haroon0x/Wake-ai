@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -15,6 +17,16 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "0.1.0"
+
+        val localProps = Properties().apply {
+            val f = rootProject.file("local.properties")
+            if (f.exists()) f.inputStream().use { load(it) }
+        }
+        buildConfigField(
+            "String",
+            "GEMINI_DEFAULT_KEY",
+            "\"${localProps.getProperty("WAKE_GEMINI_KEY", "")}\""
+        )
     }
 
     buildTypes {
@@ -37,6 +49,11 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
+    }
+
+    androidResources {
+        noCompress += "tflite"
     }
 }
 
@@ -59,4 +76,5 @@ dependencies {
     ksp(libs.room.compiler)
 
     implementation(libs.kotlinx.coroutines.android)
+    implementation("com.google.mediapipe:tasks-text:0.10.14")
 }

@@ -31,6 +31,15 @@ interface MemoryDao {
     )
     suspend fun search(match: String, limit: Int): List<MemoryEvent>
 
+    @Query("SELECT * FROM memory_event WHERE embedding IS NULL ORDER BY id DESC LIMIT :limit")
+    suspend fun unembedded(limit: Int): List<MemoryEvent>
+
+    @Query("UPDATE memory_event SET embedding = :embedding WHERE id = :id")
+    suspend fun setEmbedding(id: Long, embedding: ByteArray)
+
+    @Query("SELECT * FROM memory_event WHERE embedding IS NOT NULL ORDER BY timestamp DESC LIMIT :limit")
+    suspend fun embedded(limit: Int): List<MemoryEvent>
+
     @Query("SELECT * FROM memory_event WHERE sessionId = :sessionId ORDER BY timestamp ASC")
     suspend fun bySession(sessionId: Long): List<MemoryEvent>
 

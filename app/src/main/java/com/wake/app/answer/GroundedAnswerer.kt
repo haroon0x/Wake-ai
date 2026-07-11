@@ -17,8 +17,8 @@ class GroundedAnswerer(
     private val timeFmt = SimpleDateFormat("h:mm a", Locale.getDefault())
 
     suspend fun answer(query: String): Flow<String> {
-        val events = retriever.search(query, topK)
-        if (events.isEmpty()) return flowOf("Not found in memory.")
+        val events = retriever.hybrid(query, topK).ifEmpty { retriever.recent(120, topK) }
+        if (events.isEmpty()) return flowOf("Not found in memory. Enable Notifications and Screen memory access, then use your phone for a bit.")
         return llm.generate(prompt(query, events))
     }
 

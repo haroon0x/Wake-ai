@@ -12,7 +12,6 @@ object Prefs {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .getString(GEMINI_API_KEY, null)
             ?.takeIf { it.isNotBlank() }
-            ?: BuildConfig.GEMINI_DEFAULT_KEY.takeIf { it.isNotBlank() }
             .orEmpty()
 
     fun savedGeminiApiKey(context: Context): String =

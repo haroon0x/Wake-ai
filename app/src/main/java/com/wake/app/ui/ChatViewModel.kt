@@ -3,6 +3,7 @@ package com.wake.app.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.wake.app.WakeApp
+import com.wake.app.data.MemoryEvent
 import com.wake.app.llm.LlmException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -27,6 +28,15 @@ class ChatViewModel : ViewModel() {
     private var nextId = 0L
 
     fun send(query: String) {
+        send(query, emptyList())
+    }
+
+    fun askAboutNotification(event: MemoryEvent) {
+        val source = event.appLabel ?: event.sender ?: "this notification"
+        send("Summarize this notification from $source.", listOf(event))
+    }
+
+    private fun send(query: String, selectedEvents: List<MemoryEvent>) {
         val prompt = query.trim()
         if (prompt.isEmpty() || _busy.value) return
         _busy.value = true
@@ -37,7 +47,7 @@ class ChatViewModel : ViewModel() {
         }
         viewModelScope.launch {
             try {
-                WakeApp.instance.answerer().answer(prompt).collect { chunk ->
+                WakeApp.instance.answerer().answer(prompt, selectedEvents).collect { chunk ->
                     _messages.update { current ->
                         current.map { message ->
                             if (message.id == assistantId) message.copy(text = message.text + chunk) else message

@@ -11,18 +11,24 @@ import kotlinx.coroutines.flow.flowOf
 class GroundedAnswerer(
     private val retriever: Retriever,
     private val llm: com.wake.app.llm.LlmEngine,
-    private val topK: Int = 8
+    private val topK: Int = 8,
+    private val maxContextChars: Int = 12_000,
+    private val maxEventChars: Int = 1_500
 ) {
 
     private val timeFmt = SimpleDateFormat("h:mm a", Locale.getDefault())
 
-    suspend fun answer(query: String): Flow<String> {
+    suspend fun answer(query: String, selectedEvents: List<MemoryEvent> = emptyList()): Flow<String> {
         if (query.isBlank()) return flowOf("Ask a question about your memory.")
-        val retrieved = retriever.hybrid(query, topK)
-        val events = if (retrieved.isNotEmpty()) retrieved else if (isTemporal(query)) {
-            retriever.recent(120, topK)
+        val events = if (selectedEvents.isNotEmpty()) {
+            selectedEvents.take(topK)
         } else {
-            emptyList()
+            val retrieved = retriever.hybrid(query, topK)
+            if (retrieved.isNotEmpty()) retrieved else if (isTemporal(query)) {
+                retriever.recent(120, topK)
+            } else {
+                emptyList()
+            }
         }
         if (events.isEmpty()) return flowOf("Not found in memory. Enable Notifications and Screen memory access, then use your phone for a bit.")
         if (!llm.isReady()) return flowOf("${llm.name} is not ready. Check the model or API key.")
@@ -42,15 +48,19 @@ class GroundedAnswerer(
             Memory context:
             """.trimIndent())
         append('\n')
+        var remaining = maxContextChars
         events.forEachIndexed { index, event ->
+            if (remaining <= 0) return@forEachIndexed
+            val memory = event.text.take(minOf(maxEventChars, remaining))
             append(index + 1)
             append(". [")
             append(event.appLabel ?: event.pkg ?: event.source)
             append(", ")
             append(timeFmt.format(Date(event.timestamp)))
             append("] ")
-            append(event.text)
+            append(memory)
             append('\n')
+            remaining -= memory.length
         }
         append("\nQuestion: ")
         append(query)

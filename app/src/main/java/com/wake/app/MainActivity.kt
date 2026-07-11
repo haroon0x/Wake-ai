@@ -195,9 +195,9 @@ private fun ChatScreen(
     if (showNotifications) {
         NotificationChatSheet(
             onDismiss = { showNotifications = false },
-            onAsk = {
+            onAsk = { event ->
                 showNotifications = false
-                chatViewModel.send(it)
+                chatViewModel.askAboutNotification(event)
             }
         )
     }
@@ -357,7 +357,7 @@ private fun androidx.compose.ui.text.AnnotatedString.Builder.appendInlineFormatt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun NotificationChatSheet(onDismiss: () -> Unit, onAsk: (String) -> Unit) {
+private fun NotificationChatSheet(onDismiss: () -> Unit, onAsk: (MemoryEvent) -> Unit) {
     var notifications by remember { mutableStateOf<List<MemoryEvent>>(emptyList()) }
     val timeFormat = remember { SimpleDateFormat("h:mm a", Locale.getDefault()) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -407,7 +407,7 @@ private fun NotificationChatSheet(onDismiss: () -> Unit, onAsk: (String) -> Unit
                         val source = event.appLabel ?: event.pkg ?: "Notification"
                         Surface(
                             onClick = {
-                                onAsk("Tell me about the notification from $source at ${timeFormat.format(Date(event.timestamp))}.")
+                                onAsk(event)
                             },
                             shape = RoundedCornerShape(16.dp),
                             color = MaterialTheme.colorScheme.surfaceVariant
@@ -550,6 +550,7 @@ private fun SettingsSheet(
     var showClearConfirmation by remember { mutableStateOf(false) }
     var notificationsEnabled by remember { mutableStateOf(false) }
     var accessibilityEnabled by remember { mutableStateOf(false) }
+    val localModelState by WakeApp.instance.gemmaEngine.stateFlow.collectAsState()
     val activity = context as ComponentActivity
     val refreshPermissions = {
         notificationsEnabled = NotificationManagerCompat.getEnabledListenerPackages(context)
@@ -583,19 +584,19 @@ private fun SettingsSheet(
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 EngineChoice("Gemma on-device", "gemma", engine) {
                     engine = it
-                    Prefs.setEngineChoice(context, it)
+                    WakeApp.instance.selectEngine(it)
                 }
                 EngineChoice("Gemma cloud", "gemma_cloud", engine) {
                     engine = it
-                    Prefs.setEngineChoice(context, it)
+                    WakeApp.instance.selectEngine(it)
                 }
                 EngineChoice("Gemini cloud", "gemini", engine) {
                     engine = it
-                    Prefs.setEngineChoice(context, it)
+                    WakeApp.instance.selectEngine(it)
                 }
             }
             Text(
-                text = engineStatus(engine, apiKey),
+                text = engineStatus(engine, apiKey, localModelState),
                 style = MaterialTheme.typography.bodySmall,
                 color = if (engine == "gemma" && !WakeApp.instance.gemmaEngine.isReady()) {
                     MaterialTheme.colorScheme.error
@@ -707,8 +708,13 @@ private fun CaptureRow(
     }
 }
 
-private fun engineStatus(engine: String, savedKey: String): String = when (engine) {
-    "gemma" -> WakeApp.instance.gemmaEngine.stateMessage()
+private fun engineStatus(engine: String, savedKey: String, localState: com.wake.app.gemma.GemmaEngine.State): String = when (engine) {
+    "gemma" -> when (localState) {
+        com.wake.app.gemma.GemmaEngine.State.Missing -> "Model file missing (${com.wake.app.gemma.GemmaEngine.MODEL_FILE})"
+        com.wake.app.gemma.GemmaEngine.State.Loading -> "Loading model"
+        is com.wake.app.gemma.GemmaEngine.State.Ready -> "Ready on ${localState.backend}"
+        is com.wake.app.gemma.GemmaEngine.State.Failed -> "Model failed: ${localState.message}"
+    }
     else -> if (savedKey.isNotBlank() || Prefs.geminiApiKey(WakeApp.instance).isNotBlank()) {
         "Cloud API key ready"
     } else {

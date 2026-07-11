@@ -49,10 +49,7 @@ class WakeApp : Application() {
             model = GeminiEngine.GEMMA_CLOUD_MODEL,
             name = "Gemma cloud"
         )
-        val modelPath = GemmaEngine.defaultModelPath(this)
-        if (java.io.File(modelPath).exists()) {
-            scope.launch { gemmaEngine.load(modelPath) }
-        }
+        if (Prefs.engineChoice(this) == "gemma") loadLocalModel()
         scope.launch {
             applyRetention()
             if (!embedder.ensure()) return@launch
@@ -79,7 +76,29 @@ class WakeApp : Application() {
         else -> gemmaEngine
     }
 
-    fun answerer(): GroundedAnswerer = GroundedAnswerer(retriever, currentEngine())
+    fun answerer(): GroundedAnswerer {
+        val engine = currentEngine()
+        return if (engine === gemmaEngine) {
+            GroundedAnswerer(retriever, engine, topK = 6, maxContextChars = 4_800, maxEventChars = 800)
+        } else {
+            GroundedAnswerer(retriever, engine, topK = 8, maxContextChars = 12_000, maxEventChars = 1_500)
+        }
+    }
+
+    fun selectEngine(choice: String) {
+        Prefs.setEngineChoice(this, choice)
+        if (choice == "gemma") {
+            loadLocalModel()
+        } else {
+            gemmaEngine.close()
+        }
+    }
+
+    private fun loadLocalModel() {
+        if (gemmaEngine.state is GemmaEngine.State.Loading || gemmaEngine.isReady()) return
+        val modelPath = GemmaEngine.defaultModelPath(this)
+        if (java.io.File(modelPath).isFile) scope.launch { gemmaEngine.load(modelPath) }
+    }
 
     suspend fun applyRetention() {
         val days = Prefs.retentionDays(this)

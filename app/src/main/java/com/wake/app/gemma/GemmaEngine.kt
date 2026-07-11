@@ -10,6 +10,9 @@ import java.io.File
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.sync.Mutex
@@ -36,38 +39,38 @@ class GemmaEngine(
     @Volatile
     private var engine: Engine? = null
 
-    @Volatile
-    var state: State = State.Missing
-        private set
+    private val _state = MutableStateFlow<State>(State.Missing)
+    val stateFlow: StateFlow<State> = _state.asStateFlow()
+    val state: State get() = _state.value
 
     suspend fun load(modelPath: String) {
         withContext(dispatcher) {
             mutex.withLock {
                 val model = File(modelPath)
                 if (!model.isFile || !model.canRead()) {
-                    state = State.Missing
+                    _state.value = State.Missing
                     return@withLock
                 }
 
-                state = State.Loading
+                _state.value = State.Loading
                 engine?.close()
                 engine = null
 
                 val gpu = runCatching { createEngine(modelPath, Backend.GPU()) }
                 if (gpu.isSuccess) {
                     engine = gpu.getOrThrow()
-                    state = State.Ready("GPU")
+                    _state.value = State.Ready("GPU")
                     return@withLock
                 }
 
                 val cpu = runCatching { createEngine(modelPath, Backend.CPU()) }
                 if (cpu.isSuccess) {
                     engine = cpu.getOrThrow()
-                    state = State.Ready("CPU")
+                    _state.value = State.Ready("CPU")
                     return@withLock
                 }
 
-                state = State.Failed(cpu.exceptionOrNull()?.message ?: "Model initialization failed.")
+                _state.value = State.Failed(cpu.exceptionOrNull()?.message ?: "Model initialization failed.")
             }
         }
     }
@@ -109,7 +112,7 @@ class GemmaEngine(
     fun close() {
         engine?.close()
         engine = null
-        state = State.Missing
+        _state.value = State.Missing
     }
 
     companion object {

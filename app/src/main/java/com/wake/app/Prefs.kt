@@ -28,8 +28,8 @@ object Prefs {
 
     fun engineChoice(context: Context): String =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .getString(ENGINE_CHOICE, "gemma")
-            ?: "gemma"
+            .getString(ENGINE_CHOICE, "gemma_cloud")
+            ?: "gemma_cloud"
 
     fun setEngineChoice(context: Context, v: String) {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)

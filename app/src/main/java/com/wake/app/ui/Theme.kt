@@ -17,21 +17,25 @@ private val WakeColors = darkColorScheme(
     onPrimaryContainer = Color(0xFFD3F5EC),
     secondary = Color(0xFFE9C46A),
     onSecondary = Color(0xFF241B04),
-    background = Color(0xFF0B0D12),
-    onBackground = Color(0xFFE9EAF0),
-    surface = Color(0xFF10131A),
-    onSurface = Color(0xFFE9EAF0),
-    surfaceVariant = Color(0xFF191D27),
-    onSurfaceVariant = Color(0xFFC4C7D1),
-    outline = Color(0xFF353B49),
+    background = Color(0xFF0A0C10),
+    onBackground = Color(0xFFEAECEF),
+    surface = Color(0xFF11141B),
+    onSurface = Color(0xFFEAECEF),
+    surfaceVariant = Color(0xFF1A1F29),
+    onSurfaceVariant = Color(0xFFC6CAD3),
+    tertiary = Color(0xFF9AB8FF),
+    onTertiary = Color(0xFF0D1B33),
+    outline = Color(0xFF333A48),
     error = Color(0xFFFFB4AB)
 )
 
 private val WakeTypography = Typography(
-    bodyLarge = TextStyle(fontFamily = FontFamily.SansSerif, fontSize = 16.sp, lineHeight = 24.sp),
-    bodyMedium = TextStyle(fontFamily = FontFamily.SansSerif, fontSize = 14.sp, lineHeight = 20.sp),
-    titleMedium = TextStyle(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.SemiBold, fontSize = 17.sp),
-    headlineSmall = TextStyle(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.Bold, fontSize = 24.sp)
+    bodyLarge = TextStyle(fontFamily = FontFamily.SansSerif, fontSize = 16.sp, lineHeight = 24.sp, letterSpacing = 0.1.sp),
+    bodyMedium = TextStyle(fontFamily = FontFamily.SansSerif, fontSize = 14.sp, lineHeight = 20.sp, letterSpacing = 0.1.sp),
+    titleMedium = TextStyle(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.SemiBold, fontSize = 17.sp, letterSpacing = 0.sp),
+    headlineSmall = TextStyle(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.Bold, fontSize = 24.sp, letterSpacing = (-0.3).sp),
+    labelSmall = TextStyle(fontFamily = FontFamily.SansSerif, fontSize = 11.sp, lineHeight = 14.sp, letterSpacing = 0.3.sp),
+    labelMedium = TextStyle(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.Medium, fontSize = 12.sp, letterSpacing = 0.3.sp)
 )
 
 @Composable

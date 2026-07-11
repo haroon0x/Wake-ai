@@ -20,6 +20,7 @@ Update this document whenever a feature lands: flip its status, and amend the af
 | Gemini Flash and Gemma 4 cloud API engine (`llm/GeminiEngine`) | Done |
 | LiteRT-LM real inference in `GemmaEngine` (`litertlm-android:0.13.0`, GPU→CPU fallback) | Done (needs on-device verify) |
 | Chat UI: streaming bubbles, typing indicator, suggestion chips, settings sheet | Done |
+| Notification conversations UI: grouped-by-sender threads with in-thread Wake chat (`ui/NotificationChat`) | Done (needs on-device verify) |
 | Retention policy + clear-all (settings sheet, `applyRetention`) | Done |
 | Debug-only JSONL ingestion/retrieval diagnostics | Done |
 | Agent loop: pending-reply triggers → cloud reasoner → approval-gated actions (`agent/`) | Done (needs on-device verify) |

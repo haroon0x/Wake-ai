@@ -99,6 +99,7 @@ import com.wake.app.ui.AgentSheet
 import com.wake.app.ui.AgentViewModel
 import com.wake.app.ui.ChatMessage
 import com.wake.app.ui.ChatViewModel
+import com.wake.app.ui.NotificationChatSheet
 import com.wake.app.ui.WakeTheme
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -251,13 +252,7 @@ private fun ChatScreen(
         AgentSheet(onDismiss = { showAgent = false }, viewModel = agentViewModel)
     }
     if (showNotifications) {
-        NotificationChatSheet(
-            onDismiss = { showNotifications = false },
-            onAsk = { event ->
-                showNotifications = false
-                chatViewModel.askAboutNotification(event)
-            }
-        )
+        NotificationChatSheet(onDismiss = { showNotifications = false })
     }
 }
 
@@ -273,17 +268,26 @@ private fun TopBar(
             modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 12.dp, top = 12.dp, bottom = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = "Wake",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = (-0.4).sp
-            )
-            Box(
-                modifier = Modifier.padding(start = 7.dp, top = 2.dp).size(7.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primary, modifier = Modifier.fillMaxSize()) {}
+            Column {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "Wake",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = (-0.4).sp
+                    )
+                    Box(
+                        modifier = Modifier.padding(start = 7.dp, top = 2.dp).size(7.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primary, modifier = Modifier.fillMaxSize()) {}
+                    }
+                }
+                Text(
+                    text = "On-device memory",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
             Spacer(modifier = Modifier.weight(1f))
             IconButton(onClick = onAgent) {
@@ -319,20 +323,27 @@ private fun EmptyState(onSuggestion: (String) -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Surface(shape = RoundedCornerShape(22.dp), color = MaterialTheme.colorScheme.primaryContainer) {
+        Surface(shape = RoundedCornerShape(26.dp), color = MaterialTheme.colorScheme.primaryContainer) {
             Text(
                 text = "W",
-                modifier = Modifier.padding(horizontal = 19.dp, vertical = 12.dp),
+                modifier = Modifier.padding(horizontal = 22.dp, vertical = 14.dp),
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onPrimaryContainer
+                color = MaterialTheme.colorScheme.primary
             )
         }
         Text(
             text = "Ask anything about what you've seen.",
-            modifier = Modifier.padding(top = 20.dp, bottom = 18.dp),
+            modifier = Modifier.padding(top = 22.dp),
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold
+        )
+        Text(
+            text = "Wake remembers your notifications and screens, privately, on this phone.",
+            modifier = Modifier.padding(top = 6.dp, bottom = 20.dp),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center
         )
         suggestions.forEach { suggestion ->
             FilterChip(
@@ -425,103 +436,6 @@ private fun androidx.compose.ui.text.AnnotatedString.Builder.appendInlineFormatt
                 append(value.substring(next + 1, end))
             }
             cursor = end + 1
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun NotificationChatSheet(onDismiss: () -> Unit, onAsk: (MemoryEvent) -> Unit) {
-    var notifications by remember { mutableStateOf<List<MemoryEvent>>(emptyList()) }
-    val timeFormat = remember { SimpleDateFormat("h:mm a", Locale.getDefault()) }
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-
-    LaunchedEffect(Unit) {
-        notifications = WakeApp.instance.dao.since(
-            System.currentTimeMillis() - 7 * 86_400_000L,
-            100
-        ).filter { it.source == SOURCE_NOTIFICATION }.take(30)
-    }
-
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, bottom = 28.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("Notification memory", style = MaterialTheme.typography.headlineSmall)
-                    Text(
-                        "Recent conversations captured by Wake",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                IconButton(onClick = onDismiss) {
-                    Icon(Icons.Outlined.Close, contentDescription = "Close")
-                }
-            }
-            if (notifications.isEmpty()) {
-                Surface(shape = RoundedCornerShape(18.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
-                    Column(modifier = Modifier.fillMaxWidth().padding(18.dp)) {
-                        Text("No notifications captured yet", fontWeight = FontWeight.SemiBold)
-                        Text(
-                            "Enable notification access in Settings. New messages will appear here.",
-                            modifier = Modifier.padding(top = 5.dp),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxWidth().height(480.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    itemsIndexed(notifications, key = { _, event -> event.id }) { _, event ->
-                        val source = event.displaySource()
-                        Surface(
-                            onClick = {
-                                onAsk(event)
-                            },
-                            shape = RoundedCornerShape(16.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant
-                        ) {
-                            Column(modifier = Modifier.fillMaxWidth().padding(14.dp)) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer) {
-                                        Text(
-                                            source.take(1).uppercase(Locale.getDefault()),
-                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                    }
-                                    Column(modifier = Modifier.padding(start = 10.dp).weight(1f)) {
-                                        Text(event.sender ?: source, fontWeight = FontWeight.SemiBold)
-                                        Text(
-                                            "$source · ${timeFormat.format(Date(event.timestamp))}",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                }
-                                Text(
-                                    event.text,
-                                    modifier = Modifier.padding(top = 10.dp),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    maxLines = 3
-                                )
-                                Text(
-                                    "Ask Wake about this",
-                                    modifier = Modifier.padding(top = 9.dp),
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.secondary
-                                )
-                            }
-                        }
-                    }
-                }
-            }
         }
     }
 }

@@ -25,3 +25,20 @@ data class MemoryEvent(
     val contentHash: String,
     val embedding: ByteArray? = null
 )
+
+fun MemoryEvent.displaySource(): String {
+    val label = appLabel?.trim()?.takeIf { value ->
+        value.isNotEmpty() && !(value.count { it == '.' } >= 2 && value.none(Char::isWhitespace))
+    }
+    return label ?: when (source) {
+        SOURCE_NOTIFICATION -> "Notification"
+        SOURCE_SCREEN_TEXT -> "Screen memory"
+        SOURCE_MANUAL -> "Saved memory"
+        else -> "Memory"
+    }
+}
+
+fun String.withoutPackageIdentifiers(): String = replace(
+    Regex("\\b(?:com|org|net|io|in|android)\\.[A-Za-z0-9_]+(?:\\.[A-Za-z0-9_]+)+\\b"),
+    "the app"
+)

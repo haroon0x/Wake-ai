@@ -3,6 +3,7 @@ package com.wake.app
 import android.app.Application
 import com.wake.app.capture.Ingest
 import com.wake.app.data.MemoryDao
+import com.wake.app.data.Diagnostics
 import com.wake.app.data.WakeDb
 import com.wake.app.answer.GroundedAnswerer
 import com.wake.app.gemma.GemmaEngine
@@ -26,6 +27,8 @@ class WakeApp : Application() {
         private set
     lateinit var embedder: Embedder
         private set
+    lateinit var diagnostics: Diagnostics
+        private set
     lateinit var gemmaEngine: GemmaEngine
         private set
     lateinit var geminiEngine: GeminiEngine
@@ -38,10 +41,11 @@ class WakeApp : Application() {
     override fun onCreate() {
         super.onCreate()
         instance = this
+        diagnostics = Diagnostics(this)
         dao = WakeDb.get(this).memoryDao()
         embedder = Embedder(this)
-        ingest = Ingest(dao, scope, embedder, { Prefs.retentionDays(this) })
-        retriever = Retriever(dao, embedder)
+        ingest = Ingest(dao, scope, embedder, { Prefs.retentionDays(this) }, diagnostics = diagnostics)
+        retriever = Retriever(dao, embedder, diagnostics)
         gemmaEngine = GemmaEngine(this)
         geminiEngine = GeminiEngine(apiKeyProvider = { Prefs.geminiApiKey(this) })
         gemmaCloudEngine = GeminiEngine(

@@ -13,10 +13,16 @@ data class RawCapture(
     val structured: String? = null
 ) {
     fun contentHash(): String {
-        val raw = "$source|$pkg|$sender|$text"
+        val normalized = normalizedText()
+        val raw = if (normalized.length >= 24) normalized else "$pkg|$sender|$normalized"
         val bytes = MessageDigest.getInstance("SHA-256").digest(raw.toByteArray())
         return bytes.joinToString("") { "%02x".format(it) }
     }
+
+    fun normalizedText(): String = text
+        .trim()
+        .replace(Regex("\\s+"), " ")
+        .lowercase()
 
     fun toEvent(sessionId: Long, hash: String) = MemoryEvent(
         timestamp = timestamp,

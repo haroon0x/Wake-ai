@@ -2,6 +2,8 @@ package com.wake.app.answer
 
 import com.wake.app.data.MemoryEvent
 import com.wake.app.data.SOURCE_NOTIFICATION
+import com.wake.app.data.displaySource
+import com.wake.app.data.withoutPackageIdentifiers
 import com.wake.app.retrieval.Retriever
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -25,7 +27,7 @@ class DeterministicComposer(private val retriever: Retriever) {
     private suspend fun recentActivity(): String {
         val events = retriever.recent(30)
         if (events.isEmpty()) return "No memory captured in the last 30 minutes yet."
-        val apps = events.map { it.appLabel ?: it.pkg ?: "unknown" }
+        val apps = events.map { it.displaySource() }
             .distinct()
             .take(6)
         val first = events.minByOrNull { it.timestamp }!!
@@ -38,9 +40,9 @@ class DeterministicComposer(private val retriever: Retriever) {
             val notable = events.firstOrNull { it.text.length in 12..200 }
             if (notable != null) {
                 append("Most recent notable item: \"")
-                append(notable.text.take(120))
+                append(notable.text.withoutPackageIdentifiers().take(120))
                 append("\" (")
-                append(notable.appLabel ?: notable.pkg)
+                append(notable.displaySource())
                 append(").")
             }
         }
@@ -55,7 +57,7 @@ class DeterministicComposer(private val retriever: Retriever) {
                 append("• ")
                 append(it.sender)
                 append(": \"")
-                append(it.text.take(80))
+                append(it.text.withoutPackageIdentifiers().take(80))
                 append("\" (")
                 append(timeFmt.format(Date(it.timestamp)))
                 append(")\n")
@@ -69,9 +71,9 @@ class DeterministicComposer(private val retriever: Retriever) {
         val top = hits.first()
         return buildString {
             append("Found: \"")
-            append(top.text.take(160))
+            append(top.text.withoutPackageIdentifiers().take(160))
             append("\"\nSource: ")
-            append(top.appLabel ?: top.pkg ?: top.source)
+            append(top.displaySource())
             append(", ")
             append(timeFmt.format(Date(top.timestamp)))
             append(".")
@@ -81,6 +83,6 @@ class DeterministicComposer(private val retriever: Retriever) {
 
     fun format(events: List<MemoryEvent>): String =
         events.joinToString("\n") {
-            "${timeFmt.format(Date(it.timestamp))}  ${it.appLabel ?: it.pkg ?: it.source}: ${it.text.take(80)}"
+            "${timeFmt.format(Date(it.timestamp))}  ${it.displaySource()}: ${it.text.withoutPackageIdentifiers().take(80)}"
         }
 }

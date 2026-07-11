@@ -11,7 +11,7 @@ Update this document whenever a feature lands: flip its status, and amend the af
 | Room storage + FTS4 search (`data/`) | Done |
 | Notification capture (`WakeNotificationListener`) | Done |
 | Screen text capture via AccessibilityService (`ScreenTextService`) | Done |
-| Ingest pipeline: exclusions, dedup, sessions (`capture/`) | Done |
+| Ingest pipeline: exclusions, normalized/near dedup, screen deltas, chunks, durable app-aware sessions (`capture/`) | Done |
 | Retrieval (`retrieval/Retriever`) | Done |
 | Semantic retrieval (on-device embeddings, hybrid) | Done |
 | Deterministic answers, no-LLM floor (`answer/DeterministicComposer`) | Done |
@@ -21,6 +21,7 @@ Update this document whenever a feature lands: flip its status, and amend the af
 | LiteRT-LM real inference in `GemmaEngine` (`litertlm-android:0.13.0`, GPU→CPU fallback) | Done (needs on-device verify) |
 | Chat UI: streaming bubbles, typing indicator, suggestion chips, settings sheet | Done |
 | Retention policy + clear-all (settings sheet, `applyRetention`) | Done |
+| Debug-only JSONL ingestion/retrieval diagnostics | Done |
 | Agent actions (detect abandoned task → propose → act) | Not started |
 
 ## Data flow
@@ -50,12 +51,12 @@ All captures are converted to text at ingest time; no pixels or screenshots are 
 - `WakeDb` — singleton Room database, destructive migration (pre-1.0).
 
 ### `capture/` — ingestion
-- `RawCapture` — value object; `contentHash()` = SHA-256 of `source|pkg|sender|text`.
-- `Ingest` — single entry point `submit(raw)`: trim → exclusion check → dedup window → session assignment → insert → on-device embedding. Runs on a single-threaded IO dispatcher.
-- `SessionGrouper` — gap-based sessions (2 min); sessionId = session-start timestamp.
+- `RawCapture` — value object; `contentHash()` uses normalized text for cross-source exact dedup, retaining package/sender identity for short captures.
+- `Ingest` — single entry point `submit(raw)`: trim → exclusion check → exact/near dedup → screen chunking → durable session assignment → insert → on-device embedding. Runs on a single-threaded IO dispatcher.
+- `SessionGrouper` — restores the latest stored session after process restart and starts a new session after a 2-minute gap or a significant app switch.
 - `Exclusions` — own package, banking/UPI/payment apps and keywords. Hard drop, never stored.
-- `WakeNotificationListener` — skips ongoing/group-summary notifications; prefers `MessagingStyle` for per-message sender, falls back to title/text extras.
-- `ScreenTextService` — AccessibilityService; walks the node tree collecting text + contentDescription, throttled 1500 ms per package, capped at 4000 chars per dump.
+- `WakeNotificationListener` — skips ongoing/group-summary notifications; prefers `MessagingStyle` for per-message sender, falls back to title/text extras, and records notification/conversation context.
+- `ScreenTextService` — AccessibilityService; walks the node tree collecting unique text + contentDescription, skips unchanged screens, emits newly added lines for overlapping screens, and records window/URL/focus context. Captures are throttled 1500 ms per package and capped at 4000 chars before chunking.
 
 ### `retrieval/`
 - `Retriever` — `recent(minutes, limit)`, FTS search, semantic search, and hybrid retrieval. It uses MediaPipe TextEmbedder with the bundled `universal_sentence_encoder.tflite`, cosine brute-force scoring, and stays fully local.
@@ -66,13 +67,16 @@ All captures are converted to text at ingest time; no pixels or screenshots are 
 
 ### `llm/` + `gemma/` — engines
 - `LlmEngine` — `name`, `isReady()`, `generate(prompt): Flow<String>`. GroundedAnswerer depends on this interface only.
-- `GemmaEngine` — LiteRT-LM runner for `gemma-4-E2B-it.litertlm` loaded from the app's external files dir. GPU (OpenCL) backend first, CPU fallback. Ships with an echo fallback until the real LiteRT-LM calls are wired (see `design/litert-lm-plan.md`).
+- `GemmaEngine` — LiteRT-LM runner for `gemma-4-E2B-it.litertlm` loaded from the app's external files dir. GPU (OpenCL) backend first, CPU fallback, with streamed conversation inference and explicit resource cleanup.
 - `GeminiEngine` — Gemini Flash and Gemma 4 cloud via the `generativelanguage.googleapis.com` REST SSE endpoint, plain HttpURLConnection, no SDK dependency. Includes a built-in default API key for the demo; users can override it.
 
 ### App shell
 - `WakeApp` — Application singleton; manual DI. Exposes dao, ingest, retriever, all three engines, and `answerer()` which picks the engine from prefs.
 - `Prefs` — SharedPreferences: `engineChoice` (`gemma` default | `gemma_cloud` | `gemini`), `geminiApiKey` with a built-in demo default.
 - `MainActivity` — single Compose screen: permission deep-links, ask field, engine toggle, streaming answer card, recent-events list.
+- `Diagnostics` — debug-build-only JSONL trace at `files/wake_debug.jsonl`, rotated at 5 MB, covering ingestion decisions, stored events, retrieval candidates, and final chat answers.
+
+Pull the current trace from a connected debug device with `adb exec-out run-as com.wake.app cat files/wake_debug.jsonl > wake_debug.jsonl`. The previous rotated trace is available as `files/wake_debug.previous.jsonl`.
 
 ## Key decisions
 

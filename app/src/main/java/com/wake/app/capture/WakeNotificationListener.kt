@@ -5,6 +5,7 @@ import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import androidx.core.app.NotificationCompat
 import com.wake.app.WakeApp
+import org.json.JSONObject
 
 class WakeNotificationListener : NotificationListenerService() {
 
@@ -19,16 +20,30 @@ class WakeNotificationListener : NotificationListenerService() {
 
         if (style != null && style.messages.isNotEmpty()) {
             val last = style.messages.last()
-            submit(sbn.postTime, pkg, appLabel, last.person?.name?.toString(), last.text?.toString().orEmpty())
+            submit(
+                sbn.postTime,
+                pkg,
+                appLabel,
+                last.person?.name?.toString(),
+                last.text?.toString().orEmpty(),
+                notificationContext(sbn, n, style.conversationTitle?.toString())
+            )
             return
         }
 
         val title = n.extras.getCharSequence("android.title")?.toString()
         val text = n.extras.getCharSequence("android.text")?.toString().orEmpty()
-        submit(sbn.postTime, pkg, appLabel, title, text)
+        submit(sbn.postTime, pkg, appLabel, title, text, notificationContext(sbn, n, null))
     }
 
-    private fun submit(ts: Long, pkg: String, appLabel: String?, sender: String?, text: String) {
+    private fun submit(
+        ts: Long,
+        pkg: String,
+        appLabel: String?,
+        sender: String?,
+        text: String,
+        structured: String
+    ) {
         if (text.isBlank()) return
         WakeApp.instance.ingest.submit(
             RawCapture(
@@ -37,10 +52,23 @@ class WakeNotificationListener : NotificationListenerService() {
                 pkg = pkg,
                 appLabel = appLabel,
                 sender = sender,
-                text = text
+                text = text,
+                structured = structured
             )
         )
     }
+
+    private fun notificationContext(
+        sbn: StatusBarNotification,
+        notification: Notification,
+        conversationTitle: String?
+    ): String = JSONObject()
+        .put("captureKind", "notification")
+        .put("notificationKey", sbn.key)
+        .put("groupKey", sbn.groupKey)
+        .put("category", notification.category)
+        .put("conversationTitle", conversationTitle)
+        .toString()
 
     private fun labelFor(pkg: String): String? = try {
         val pm = packageManager

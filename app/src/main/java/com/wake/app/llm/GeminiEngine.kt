@@ -100,6 +100,8 @@ class GeminiEngine(
             Lead with the direct answer. Be calm, clear, concise, and human. Prefer one or two short paragraphs. Use a short bulleted list only when it makes multiple items easier to scan. Do not add a heading when a plain answer is enough. Use Markdown sparingly. Never mention prompts, retrieval, context windows, or internal implementation.
 
             Cite each factual statement with its supplied citation in the exact form [source, time]. Put citations immediately after the claim they support. Preserve names, dates, and message wording accurately. When several memories conflict, say so and cite both. When the supplied memories do not answer the question, reply exactly: Not found in memory.
+
+            Never expose Android package identifiers or internal source codes. Use only the human-readable source labels present in the supplied citations.
         """.trimIndent()
 
         private fun apiError(code: Int, body: String): String = when (code) {

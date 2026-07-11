@@ -90,6 +90,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.wake.app.data.MemoryEvent
 import com.wake.app.data.SOURCE_NOTIFICATION
+import com.wake.app.data.displaySource
 import com.wake.app.ui.ChatMessage
 import com.wake.app.ui.ChatViewModel
 import com.wake.app.ui.WakeTheme
@@ -404,7 +405,7 @@ private fun NotificationChatSheet(onDismiss: () -> Unit, onAsk: (MemoryEvent) ->
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     itemsIndexed(notifications, key = { _, event -> event.id }) { _, event ->
-                        val source = event.appLabel ?: event.pkg ?: "Notification"
+                        val source = event.displaySource()
                         Surface(
                             onClick = {
                                 onAsk(event)
@@ -651,7 +652,7 @@ private fun SettingsSheet(
                     Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
                         Column(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
                             Text(
-                                text = event.appLabel ?: event.pkg ?: event.source,
+                                text = event.displaySource(),
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.primary
                             )

@@ -4,12 +4,14 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.wake.app.WakeApp
 import com.wake.app.data.MemoryEvent
+import com.wake.app.data.withoutPackageIdentifiers
 import com.wake.app.llm.LlmException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import org.json.JSONArray
 
 data class ChatMessage(
     val id: Long,
@@ -42,6 +44,11 @@ class ChatViewModel : ViewModel() {
         _busy.value = true
         val userId = nextId++
         val assistantId = nextId++
+        WakeApp.instance.diagnostics.record(
+            "chat_query",
+            "query" to prompt,
+            "selectedEventIds" to JSONArray(selectedEvents.map { it.id })
+        )
         _messages.update {
             it + ChatMessage(userId, "user", prompt) + ChatMessage(assistantId, "assistant", "", true)
         }
@@ -50,7 +57,11 @@ class ChatViewModel : ViewModel() {
                 WakeApp.instance.answerer().answer(prompt, selectedEvents).collect { chunk ->
                     _messages.update { current ->
                         current.map { message ->
-                            if (message.id == assistantId) message.copy(text = message.text + chunk) else message
+                            if (message.id == assistantId) {
+                                message.copy(text = (message.text + chunk).withoutPackageIdentifiers())
+                            } else {
+                                message
+                            }
                         }
                     }
                 }
@@ -64,6 +75,8 @@ class ChatViewModel : ViewModel() {
                         if (message.id == assistantId) message.copy(streaming = false) else message
                     }
                 }
+                val answer = _messages.value.firstOrNull { it.id == assistantId }?.text.orEmpty()
+                WakeApp.instance.diagnostics.record("chat_answer", "query" to prompt, "answer" to answer)
                 _busy.value = false
             }
         }

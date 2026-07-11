@@ -13,6 +13,7 @@ import com.wake.app.answer.GroundedAnswerer
 import com.wake.app.gemma.GemmaEngine
 import com.wake.app.llm.GeminiEngine
 import com.wake.app.llm.LlmEngine
+import com.wake.app.llm.AntigravityEngine
 import com.wake.app.data.toByteArray
 import com.wake.app.retrieval.Embedder
 import com.wake.app.retrieval.Retriever
@@ -38,6 +39,8 @@ class WakeApp : Application() {
     lateinit var geminiEngine: GeminiEngine
         private set
     lateinit var gemmaCloudEngine: GeminiEngine
+        private set
+    lateinit var antigravityEngine: AntigravityEngine
         private set
     lateinit var agentTaskDao: AgentTaskDao
         private set
@@ -66,6 +69,7 @@ class WakeApp : Application() {
             model = GeminiEngine.GEMMA_CLOUD_MODEL,
             name = "Gemma cloud"
         )
+        antigravityEngine = AntigravityEngine(apiKeyProvider = { Prefs.geminiApiKey(this) })
         agent = AgentEngine(
             taskDao = agentTaskDao,
             memoryDao = dao,

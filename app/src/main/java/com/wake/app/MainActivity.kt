@@ -150,6 +150,7 @@ private fun ChatScreen(
     var showSettings by remember { mutableStateOf(false) }
     var showNotifications by remember { mutableStateOf(false) }
     var showAgent by remember { mutableStateOf(openAgentInitially) }
+    var deepResearchEnabled by remember { mutableStateOf(false) }
 
     LaunchedEffect(messages.size, messages.lastOrNull()?.text?.length) {
         if (messages.isNotEmpty()) listState.scrollToItem(messages.lastIndex)
@@ -196,9 +197,11 @@ private fun ChatScreen(
                 query = query,
                 onQueryChange = { query = it },
                 enabled = !busy && query.isNotBlank(),
+                deepResearchEnabled = deepResearchEnabled,
+                onDeepResearchChange = { deepResearchEnabled = it },
                 onSend = {
                     if (!busy && query.isNotBlank()) {
-                        chatViewModel.send(query)
+                        chatViewModel.send(query, deepResearchEnabled)
                         query = ""
                     }
                 }
@@ -530,6 +533,8 @@ private fun InputBar(
     query: String,
     onQueryChange: (String) -> Unit,
     enabled: Boolean,
+    deepResearchEnabled: Boolean,
+    onDeepResearchChange: (Boolean) -> Unit,
     onSend: () -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
@@ -540,34 +545,61 @@ private fun InputBar(
         label = "sendScale"
     )
     Surface(color = MaterialTheme.colorScheme.surface, tonalElevation = 3.dp) {
-        Row(
-            modifier = Modifier.fillMaxWidth().imePadding().padding(horizontal = 16.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            OutlinedTextField(
-                value = query,
-                onValueChange = onQueryChange,
-                modifier = Modifier.weight(1f),
-                placeholder = { Text("Ask your phone") },
-                singleLine = true,
-                shape = RoundedCornerShape(24.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Color.Transparent,
-                    unfocusedBorderColor = Color.Transparent,
-                    focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant
-                ),
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                keyboardActions = KeyboardActions(onSend = { if (enabled) onSend() })
-            )
-            FilledIconButton(
-                onClick = onSend,
-                enabled = enabled,
-                interactionSource = interactionSource,
-                modifier = Modifier.size(48.dp).scale(scale)
+        Column(modifier = Modifier.fillMaxWidth().imePadding().padding(horizontal = 16.dp, vertical = 10.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send")
+                Text(
+                    text = "Deep Research",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (deepResearchEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = if (deepResearchEnabled) FontWeight.Bold else FontWeight.Normal
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                androidx.compose.material3.Switch(
+                    checked = deepResearchEnabled,
+                    onCheckedChange = onDeepResearchChange,
+                    modifier = Modifier.scale(0.8f)
+                )
+                Spacer(modifier = Modifier.weight(1f))
+                if (deepResearchEnabled) {
+                    Text(
+                        text = "iAPI Cloud Sandbox enabled",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = onQueryChange,
+                    modifier = Modifier.weight(1f),
+                    placeholder = { Text(if (deepResearchEnabled) "Ask cloud sandbox (with tools)" else "Ask your phone") },
+                    singleLine = true,
+                    shape = RoundedCornerShape(24.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Color.Transparent,
+                        unfocusedBorderColor = Color.Transparent,
+                        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant
+                    ),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                    keyboardActions = KeyboardActions(onSend = { if (enabled) onSend() })
+                )
+                FilledIconButton(
+                    onClick = onSend,
+                    enabled = enabled,
+                    interactionSource = interactionSource,
+                    modifier = Modifier.size(48.dp).scale(scale)
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send")
+                }
             }
         }
     }

@@ -29,16 +29,16 @@ class ChatViewModel : ViewModel() {
 
     private var nextId = 0L
 
-    fun send(query: String) {
-        send(query, emptyList())
+    fun send(query: String, deepResearch: Boolean = false) {
+        send(query, emptyList(), deepResearch)
     }
 
     fun askAboutNotification(event: MemoryEvent) {
         val source = event.appLabel ?: event.sender ?: "this notification"
-        send("Summarize this notification from $source.", listOf(event))
+        send("Summarize this notification from $source.", listOf(event), false)
     }
 
-    private fun send(query: String, selectedEvents: List<MemoryEvent>) {
+    private fun send(query: String, selectedEvents: List<MemoryEvent>, deepResearch: Boolean) {
         val prompt = query.trim()
         if (prompt.isEmpty() || _busy.value) return
         _busy.value = true
@@ -47,20 +47,54 @@ class ChatViewModel : ViewModel() {
         WakeApp.instance.diagnostics.record(
             "chat_query",
             "query" to prompt,
-            "selectedEventIds" to JSONArray(selectedEvents.map { it.id })
+            "selectedEventIds" to JSONArray(selectedEvents.map { it.id }),
+            "deepResearch" to deepResearch
         )
         _messages.update {
             it + ChatMessage(userId, "user", prompt) + ChatMessage(assistantId, "assistant", "", true)
         }
         viewModelScope.launch {
             try {
-                WakeApp.instance.answerer().answer(prompt, selectedEvents).collect { chunk ->
-                    _messages.update { current ->
-                        current.map { message ->
-                            if (message.id == assistantId) {
-                                message.copy(text = (message.text + chunk).withoutPackageIdentifiers())
-                            } else {
-                                message
+                if (deepResearch) {
+                    val events = if (selectedEvents.isNotEmpty()) {
+                        selectedEvents
+                    } else {
+                        WakeApp.instance.retriever.hybrid(prompt, 12)
+                    }
+                    val timeFmt = java.text.SimpleDateFormat("h:mm a", java.util.Locale.getDefault())
+                    val agentPrompt = buildString {
+                        append("Captured mobile context:\n")
+                        events.forEachIndexed { index, event ->
+                            append("${index + 1}. [${event.appLabel ?: event.pkg ?: event.source}, ")
+                            append(timeFmt.format(java.util.Date(event.timestamp)))
+                            append("] ")
+                            append(event.text.take(1000))
+                            append("\n")
+                        }
+                        append("\nUser query: ")
+                        append(prompt)
+                        append("\n\nInstructions: Analyze the captured mobile context. You have access to Google Search and a Python code execution sandbox. Autonomously research and verify the solution, compile scripts if needed, and write a thorough, detailed answer.")
+                    }
+                    WakeApp.instance.antigravityEngine.generate(agentPrompt).collect { chunk ->
+                        _messages.update { current ->
+                            current.map { message ->
+                                if (message.id == assistantId) {
+                                    message.copy(text = (message.text + chunk).withoutPackageIdentifiers())
+                                } else {
+                                    message
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    WakeApp.instance.answerer().answer(prompt, selectedEvents).collect { chunk ->
+                        _messages.update { current ->
+                            current.map { message ->
+                                if (message.id == assistantId) {
+                                    message.copy(text = (message.text + chunk).withoutPackageIdentifiers())
+                                } else {
+                                    message
+                                }
                             }
                         }
                     }

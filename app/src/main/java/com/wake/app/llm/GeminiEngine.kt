@@ -105,9 +105,9 @@ class GeminiEngine(
         """.trimIndent()
 
         private fun apiError(code: Int, body: String): String = when (code) {
-            400 -> "The model request was rejected. Check the selected model."
-            401, 403 -> "The API key is invalid or does not have access to this model."
-            404 -> "The selected model is unavailable."
+            400 -> "The model request was rejected (HTTP 400): $body"
+            401, 403 -> "The API key is invalid or does not have access to this model (HTTP $code): $body"
+            404 -> "The selected model is unavailable (HTTP 404): $body"
             429 -> "The model rate limit was reached. Try again shortly."
             in 500..599 -> "The model service is temporarily unavailable."
             else -> body.takeIf { it.isNotBlank() } ?: "The model request failed with HTTP $code."
